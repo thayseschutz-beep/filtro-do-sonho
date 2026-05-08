@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { LayoutDashboard, Wallet, Target, CreditCard, LogOut, Sparkles } from "lucide-react"
+import { LayoutDashboard, Wallet, Target, CreditCard, RefreshCw, LogOut, Sparkles } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
 const navItems = [
@@ -10,6 +10,7 @@ const navItems = [
   { href: "/orcamento", label: "Orçamento", icon: Wallet },
   { href: "/cartoes", label: "Cartões", icon: CreditCard },
   { href: "/metas", label: "Filtro do Sonho", icon: Target },
+  { href: "/sincronizar", label: "Sincronizar", icon: RefreshCw },
 ]
 
 export default function Navbar() {
