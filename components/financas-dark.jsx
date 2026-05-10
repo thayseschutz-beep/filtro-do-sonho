@@ -12,6 +12,19 @@ if (typeof window !== "undefined" && !window.storage) {
   };
 }
 
+// ── Mobile hook ───────────────────────────────────────────────────────────────
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth < 768 : false
+  );
+  useEffect(() => {
+    const fn = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", fn);
+    return () => window.removeEventListener("resize", fn);
+  }, []);
+  return isMobile;
+}
+
 // ── Constants ──────────────────────────────────────────────────────────────
 const MONTHS = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const MS = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
@@ -326,7 +339,9 @@ export default function App() {
     );
   };
 
-  const sw = sidebarOpen ? "220px" : "64px";
+  const isMobile = useIsMobile();
+  const sw = isMobile ? "0px" : sidebarOpen ? "220px" : "64px";
+  const [mobileMenu, setMobileMenu] = useState(false);
   const navItems = [
     { key:"dashboard", icon:"📊", label:"Dashboard" },
     { key:"lancamentos", icon:"✏️", label:"Lançamentos" },
@@ -341,7 +356,7 @@ export default function App() {
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
       {/* ── SIDEBAR ── */}
-      <div style={{ width:sw, background:T.surface, borderRight:`1px solid ${T.border}`, display:"flex", flexDirection:"column", position:"fixed", top:0, left:0, bottom:0, zIndex:100, transition:"width 0.25s ease", overflow:"hidden", boxShadow:"1px 0 0 #E2E8F0" }}>
+      <div style={{ width:sw, background:T.surface, borderRight:`1px solid ${T.border}`, display: isMobile ? "none" : "flex", flexDirection:"column", position:"fixed", top:0, left:0, bottom:0, zIndex:100, transition:"width 0.25s ease", overflow:"hidden", boxShadow:"1px 0 0 #E2E8F0" }}>
         {/* Logo */}
         <div style={{ padding:"18px 16px", borderBottom:`1px solid ${T.border}`, display:"flex", alignItems:"center", gap:"10px", whiteSpace:"nowrap" }}>
           <div style={{ width:"34px", height:"34px", borderRadius:"10px", flexShrink:0, background:"linear-gradient(135deg,#7C3AED,#0EA5E9)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"17px" }}>💰</div>
@@ -380,7 +395,7 @@ export default function App() {
       </div>
 
       {/* ── MAIN ── */}
-      <main style={{ marginLeft:sw, flex:1, padding:"24px", transition:"margin-left 0.25s ease", minHeight:"100vh" }}>
+      <main style={{ marginLeft:sw, flex:1, padding: isMobile ? "16px" : "24px", transition:"margin-left 0.25s ease", minHeight:"100vh", paddingBottom: isMobile ? "80px" : "24px" }}>
         {/* Header */}
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"22px", flexWrap:"wrap", gap:"12px" }}>
           <div>
@@ -389,7 +404,7 @@ export default function App() {
             </h1>
             <p style={{ color:T.textSub, fontSize:"13px", margin:"2px 0 0" }}>Planejamento Financeiro Pessoal • {CY}</p>
           </div>
-          {activeSection !== "cartoes" && activeSection !== "sincronizar" && (
+          {activeSection !== "cartoes" && activeSection !== "sincronizar" && !isMobile && (
             <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
               <div style={{ display:"flex", background:T.surfaceAlt, borderRadius:"10px", padding:"3px", border:`1px solid ${T.border}`, gap:"2px" }}>
                 {["mes","trimestre","ano"].map(v => (
@@ -424,7 +439,7 @@ export default function App() {
             )}
 
             {/* Metric cards row 1 */}
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:"14px", marginBottom:"14px" }}>
+            <div style={{ display:"grid", gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)", gap:"12px", marginBottom:"14px" }}>
               {[
                 { l:"RECEITAS", v:recTotal, c:T.green, bg:T.greenLight, icon:"↑" },
                 { l:"DESPESAS", v:despTotal, c:T.red, bg:T.redLight, icon:"↓" },
@@ -445,7 +460,7 @@ export default function App() {
             </div>
 
             {/* Saldo row */}
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"14px", marginBottom:"14px" }}>
+            <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:"12px", marginBottom:"14px" }}>
               <div style={{ ...card({ marginBottom:0 }), borderLeft:`4px solid #7C3AED` }}>
                 <p style={{ fontSize:"11px", fontWeight:600, color:T.textSub, textTransform:"uppercase", letterSpacing:"0.06em", margin:"0 0 6px" }}>SALDO ORÇAMENTO</p>
                 <p style={{ fontSize:"24px", fontWeight:700, color: saldo >= 0 ? T.purple : T.red, margin:"0 0 4px" }}>{fmt(saldo)}</p>
@@ -461,7 +476,7 @@ export default function App() {
             </div>
 
             {/* Charts */}
-            <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:"14px", marginBottom:"14px" }}>
+            <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr", gap:"12px", marginBottom:"14px" }}>
               <div style={{ ...card({ marginBottom:0 }) }}>
                 <p style={{ fontSize:"13px", fontWeight:600, color:T.text, marginBottom:"14px" }}>📈 Evolução Anual</p>
                 <ResponsiveContainer width="100%" height={200}>
@@ -525,7 +540,7 @@ export default function App() {
                     <span style={{ fontSize:"12px", color:T.textSub }}>Total: <strong style={{ color:T.amber }}>{fmt(faturasMes)}</strong></span>
                   </div>
                 </div>
-                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(175px,1fr))", gap:"10px" }}>
+                <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill,minmax(175px,1fr))", gap:"10px" }}>
                   {cartoes.map((c, ci) => {
                     const v = getFat(c.id, CY, currentMonth);
                     const pg = isPago(c.id, CY, currentMonth);
@@ -554,7 +569,7 @@ export default function App() {
             {/* Year summary */}
             <div style={card({ marginBottom:0 })}>
               <p style={{ fontSize:"13px", fontWeight:600, color:T.text, marginBottom:"14px" }}>📅 Resumo {CY}</p>
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:"10px" }}>
+              <div style={{ display:"grid", gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)", gap:"8px" }}>
                 {MONTHS.map((m, i) => {
                   const r = sumArr(data[i].receitas), d = sumArr(data[i].despesas), inv = sumArr(data[i].investimentos);
                   const cart = cartoes.reduce((s, c) => s + getFat(c.id, CY, i), 0);
@@ -840,7 +855,7 @@ export default function App() {
 
             {cardSub === "dashcard" && (
               <div>
-                <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:"14px", marginBottom:"14px" }}>
+                <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap:"12px", marginBottom:"14px" }}>
                   {[{l:"CARTÕES",v:cartoes.length,c:T.amber,bg:T.amberLight,f:String},{l:"TOTAL GASTO",v:totalGastoCartoes,c:T.red,bg:T.redLight,f:fmt},{l:"MÉDIA MENSAL",v:mediaFat,c:T.green,bg:T.greenLight,f:fmt}].map(m=>(
                     <div key={m.l} style={metCard(m.c)}>
                       <p style={{ fontSize:"11px",fontWeight:600,color:T.textSub,textTransform:"uppercase",letterSpacing:"0.06em",margin:"0 0 8px" }}>{m.l}</p>
@@ -932,7 +947,7 @@ export default function App() {
         )}
 
         {/* ── ACTION BUTTONS ── */}
-        <div style={{ display:"flex", gap:"8px", flexWrap:"wrap", justifyContent:"center", marginTop:"22px", paddingTop:"16px", borderTop:`1px solid ${T.border}` }}>
+        <div style={{ display:"flex", gap:"6px", flexWrap:"wrap", justifyContent:"center", marginTop:"22px", paddingTop:"16px", borderTop:`1px solid ${T.border}`, overflowX: isMobile ? "auto" : "visible" }}>
           <button style={btnPrimary(T.green)} onClick={handleSave}>💾 Salvar</button>
           <button style={btnPrimary(T.blue)} onClick={() => { setShowSearch(s=>!s); setActiveSection("lancamentos"); }}>🔍 Buscar</button>
           <button style={{ ...btnOutline(T.amber) }} onClick={() => setShowLote(true)}>📋 Lote</button>
@@ -1014,6 +1029,30 @@ export default function App() {
               <button style={btnGhost} onClick={() => setShowImport(false)}>Cancelar</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── MOBILE BOTTOM NAV ── */}
+      {isMobile && (
+        <div style={{ position:"fixed", bottom:0, left:0, right:0, zIndex:200, background:T.surface, borderTop:`1px solid ${T.border}`, display:"flex", justifyContent:"space-around", padding:"8px 0 12px", boxShadow:"0 -2px 10px rgba(0,0,0,0.08)" }}>
+          {[
+            { key:"dashboard", icon:"📊", label:"Início" },
+            { key:"lancamentos", icon:"✏️", label:"Lançar" },
+            { key:"cartoes", icon:"💳", label:"Cartões" },
+            { key:"relatorio", icon:"📈", label:"Relatório" },
+            { key:"sincronizar", icon:"🔄", label:"Sincron." },
+          ].map(n => (
+            <div key={n.key} onClick={() => setActiveSection(n.key)}
+              style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"3px", cursor:"pointer", minWidth:"56px" }}>
+              <span style={{ fontSize:"20px" }}>{n.icon}</span>
+              <span style={{ fontSize:"9px", fontWeight:600, color: activeSection===n.key ? T.purple : T.textMuted }}>
+                {n.label}
+              </span>
+              {activeSection === n.key && (
+                <span style={{ width:"4px", height:"4px", borderRadius:"50%", background:T.purple, display:"block" }}/>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
