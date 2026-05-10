@@ -240,7 +240,8 @@ function ItemList({items,col,emptyMsg,onEdit,onRemove,onBaixa,tipo}){
               {item.parafem&&<span style={{color:T.textSub,fontSize:"11px"}}>↔ {item.parafem}</span>}
               {item.banco&&<span style={{color:T.textSub,fontSize:"11px"}}>🏦 {item.banco}</span>}
               {item.meioPag&&<span style={{color:T.blue,fontSize:"11px"}}>{meioPagLabel[item.meioPag]||item.meioPag}</span>}
-              {item.parcelas>1&&<span style={{color:T.amber,fontSize:"11px"}}>{item.parcelas}x</span>}
+              {item.parcelaNum&&<span style={{color:T.amber,fontSize:"11px",fontWeight:600,background:"#FEF3C7",padding:"1px 6px",borderRadius:"4px"}}>Parcela {item.parcelaNum}/{item.parcelas} • {fmt(item.valorTotal||item.valor*item.parcelas)}</span>}
+              {!item.parcelaNum&&item.parcelas>1&&<span style={{color:T.amber,fontSize:"11px"}}>{item.parcelas}x</span>}
             </div>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:"6px",flexWrap:"wrap"}}>
@@ -397,6 +398,12 @@ export default function App(){
   const faturasAbertas=faturasMes-cartoes.reduce((s,c)=>s+(isPago(c.id,CY,currentMonth)?getFat(c.id,CY,currentMonth):0),0);
   const saldoReal=saldo-faturasAbertas;
   const recConfirmado=sumArr(monthData.receitas.filter(x=>x.recebido));
+  // Parcelados: provisão dos próximos meses
+  const proximosParcelados=yrMs.filter(m=>m>currentMonth).map(m=>({
+    month:m,
+    despesas:sumArr(safeData[m].despesas.filter(x=>x.parcelaGroupId)),
+    emprestimos:sumArr(safeData[m].emprestimos.filter(x=>x.parcelaGroupId)),
+  })).filter(m=>m.despesas>0||m.emprestimos>0).slice(0,4);
   const despConfirmada=sumArr(monthData.despesas.filter(x=>x.pago));
   const invConfirmado=sumArr(monthData.investimentos.filter(x=>x.investido));
   const empConfirmado=sumArr(monthData.emprestimos.filter(x=>x.pago));
@@ -423,7 +430,45 @@ export default function App(){
     } else if(tipo==="despesa"){
       f=despForm; key="despesas";
       if(!f.desc||!f.valor){showToast("Preencha descrição e valor","error");return;}
-      item={id:uid(),desc:f.desc,valor:parseFloat(f.valor)||0,date:f.data,ref:f.ref,fornecedor:f.fornecedor,recorrente:f.recorrente,formaPag:f.formaPag,parcelas:parseInt(f.parcelas)||1,meioPag:f.meioPag,pago:f.pago};
+      const parcelas=parseInt(f.parcelas)||1;
+      const valorTotal=parseFloat(f.valor)||0;
+
+      // ── PARCELADO: distribui nos meses seguintes ──────────────────
+      if(f.formaPag==="parcelado"&&parcelas>1){
+        const valorParcela=parseFloat((valorTotal/parcelas).toFixed(2));
+        const startMonth=new Date(f.data+"T12:00:00").getMonth();
+        const groupId=uid();
+        const nd=safeData.map(m=>({...m,despesas:[...m.despesas]}));
+        let criadas=0;
+        for(let i=0;i<parcelas;i++){
+          const targetMonth=startMonth+i;
+          if(targetMonth>11) break; // só dentro do ano
+          nd[targetMonth].despesas.push({
+            id:uid(),
+            desc:f.desc,
+            valor:valorParcela,
+            valorTotal,
+            date:f.data,
+            ref:f.ref,
+            fornecedor:f.fornecedor,
+            recorrente:false,
+            formaPag:"parcelado",
+            parcelas,
+            parcelaNum:i+1,
+            parcelaGroupId:groupId,
+            meioPag:f.meioPag,
+            pago:f.pago,
+          });
+          criadas++;
+        }
+        setData(nd);
+        setDespForm(emptyDespForm(today));
+        setShowModal(null);
+        showToast(`✅ ${criadas} parcelas distribuídas (${MONTHS[startMonth]} a ${MONTHS[Math.min(startMonth+parcelas-1,11)]})`);
+        return;
+      }
+      // ── À VISTA ───────────────────────────────────────────────────
+      item={id:uid(),desc:f.desc,valor:valorTotal,date:f.data,ref:f.ref,fornecedor:f.fornecedor,recorrente:f.recorrente,formaPag:f.formaPag,parcelas:1,meioPag:f.meioPag,pago:f.pago};
       setDespForm(emptyDespForm(today));
     } else if(tipo==="investimento"){
       f=invForm; key="investimentos";
@@ -433,7 +478,28 @@ export default function App(){
     } else {
       f=empForm; key="emprestimos";
       if(!f.desc||!f.valor){showToast("Preencha descrição e valor","error");return;}
-      item={id:uid(),desc:f.desc,valor:parseFloat(f.valor)||0,date:f.data,ref:f.ref,parafem:f.parafem,valorParcela:parseFloat(f.valorParcela)||0,parcelas:parseInt(f.parcelas)||1,dataVenc1:f.dataVenc1,dataVencN:f.dataVencN,meioPag:f.meioPag,pago:f.pago};
+      // Empréstimo parcelado — distribui nos meses
+      const parcEmp=parseInt(f.parcelas)||1;
+      const valTotalEmp=parseFloat(f.valor)||0;
+      const valParcEmp=parseFloat(f.valorParcela)||parseFloat((valTotalEmp/parcEmp).toFixed(2));
+      if(parcEmp>1){
+        const startEmp=new Date(f.data+"T12:00:00").getMonth();
+        const groupEmp=uid();
+        const nd=safeData.map(m=>({...m,emprestimos:[...m.emprestimos]}));
+        let criadasEmp=0;
+        for(let i=0;i<parcEmp;i++){
+          const tm=startEmp+i;
+          if(tm>11) break;
+          nd[tm].emprestimos.push({id:uid(),desc:f.desc,valor:valParcEmp,valorTotal:valTotalEmp,date:f.data,ref:f.ref,parafem:f.parafem,parcelas:parcEmp,parcelaNum:i+1,parcelaGroupId:groupEmp,dataVenc1:f.dataVenc1,dataVencN:f.dataVencN,meioPag:f.meioPag,pago:f.pago});
+          criadasEmp++;
+        }
+        setData(nd);
+        setEmpForm(emptyEmpForm(today));
+        setShowModal(null);
+        showToast(`✅ ${criadasEmp} parcelas de empréstimo distribuídas!`);
+        return;
+      }
+      item={id:uid(),desc:f.desc,valor:valParcEmp,valorTotal:valTotalEmp,date:f.data,ref:f.ref,parafem:f.parafem,valorParcela:valParcEmp,parcelas:parcEmp,dataVenc1:f.dataVenc1,dataVencN:f.dataVencN,meioPag:f.meioPag,pago:f.pago};
       setEmpForm(emptyEmpForm(today));
     }
     setData(d=>d.map((m,i)=>i===currentMonth?{...m,[key]:[...m[key],item]}:m));
@@ -443,6 +509,23 @@ export default function App(){
 
   const removeItem=(tipo,id)=>{
     const key=tipo==="receita"?"receitas":tipo==="despesa"?"despesas":tipo==="investimento"?"investimentos":"emprestimos";
+    const allMonthItems=safeData.flatMap(m=>m[key]);
+    const targetItem=allMonthItems.find(x=>x.id===id);
+    if(targetItem?.parcelaGroupId){
+      const gid=targetItem.parcelaGroupId;
+      const totalGrupo=safeData.reduce((s,m)=>s+m[key].filter(x=>x.parcelaGroupId===gid).length,0);
+      if(totalGrupo>1){
+        const choice=confirm(`Parcela ${targetItem.parcelaNum}/${targetItem.parcelas} de "${targetItem.desc}".
+
+OK = Remover TODAS as parcelas
+Cancelar = Remover só esta parcela`);
+        if(choice){
+          setData(d=>d.map(m=>({...m,[key]:m[key].filter(x=>x.parcelaGroupId!==gid)})));
+          showToast(`Todas as parcelas de "${targetItem.desc}" removidas.`);
+          return;
+        }
+      }
+    }
     setData(d=>d.map((m,i)=>i===currentMonth?{...m,[key]:m[key].filter(x=>x.id!==id)}:m));
   };
 
@@ -450,6 +533,25 @@ export default function App(){
     const key=tipo==="receita"?"receitas":tipo==="despesa"?"despesas":tipo==="investimento"?"investimentos":"emprestimos";
     const statusField=tipo==="receita"?"recebido":tipo==="investimento"?"investido":"pago";
     const dataBaixa=new Date().toISOString().split("T")[0];
+    const targetItem=safeData[currentMonth][key].find(x=>x.id===id);
+    const jaConfirmado=!!targetItem?.[statusField];
+
+    // Se é parcela de um grupo e ainda não foi confirmada, oferece opção de baixar todas
+    if(!jaConfirmado&&targetItem?.parcelaGroupId){
+      const gid=targetItem.parcelaGroupId;
+      const totalRestante=safeData.reduce((s,m)=>s+m[key].filter(x=>x.parcelaGroupId===gid&&!x[statusField]).length,0);
+      if(totalRestante>1){
+        const darBaixaTodas=confirm(`Parcela ${targetItem.parcelaNum}/${targetItem.parcelas} de "${targetItem.desc}".
+
+OK = Dar baixa em TODAS as parcelas restantes (${totalRestante})
+Cancelar = Dar baixa só nesta parcela`);
+        if(darBaixaTodas){
+          setData(d=>d.map(m=>({...m,[key]:m[key].map(x=>x.parcelaGroupId===gid?{...x,[statusField]:true,dataBaixa}:x)})));
+          showToast(`✅ Todas as parcelas de "${targetItem.desc}" confirmadas!`);
+          return;
+        }
+      }
+    }
     setData(d=>d.map((m,i)=>i===currentMonth?{...m,[key]:m[key].map(x=>x.id===id?{...x,[statusField]:!x[statusField],dataBaixa:!x[statusField]?dataBaixa:null}:x)}:m));
     showToast("Status atualizado!");
   };
@@ -643,6 +745,22 @@ export default function App(){
               <p style={{fontSize:"11px",fontWeight:600,color:T.textSub,textTransform:"uppercase",letterSpacing:"0.06em",margin:"0 0 4px"}}>EMPRÉSTIMOS / PARCELAMENTOS</p>
               <p style={{fontSize:"20px",fontWeight:700,color:T.amber,margin:0}}>{fmt(empTotal)}</p>
             </div>}
+
+            {proximosParcelados.length>0&&(
+              <div style={{...card({marginBottom:"12px"}),background:"#FFFBEB",border:"1px solid #FDE68A"}}>
+                <p style={{fontSize:"13px",fontWeight:700,color:T.amber,margin:"0 0 10px"}}>📅 Provisão — Parcelas nos próximos meses</p>
+                <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
+                  {proximosParcelados.map(f=>(
+                    <div key={f.month} style={{background:T.surface,border:"1px solid #FDE68A",borderRadius:"10px",padding:"10px 14px",minWidth:"110px",cursor:"pointer"}} onClick={()=>setCurrentMonth(f.month)}>
+                      <p style={{fontSize:"11px",fontWeight:700,color:T.amber,margin:"0 0 3px"}}>{MONTHS[f.month]}</p>
+                      {f.despesas>0&&<p style={{fontSize:"12px",color:T.red,margin:"1px 0",fontWeight:600}}>Desp: {fmt(f.despesas)}</p>}
+                      {f.emprestimos>0&&<p style={{fontSize:"12px",color:T.amber,margin:"1px 0",fontWeight:600}}>Emp: {fmt(f.emprestimos)}</p>}
+                    </div>
+                  ))}
+                </div>
+                <p style={{fontSize:"11px",color:T.textSub,margin:"8px 0 0"}}>💡 Valores de despesas e empréstimos parcelados já provisionados. Clique no mês para ver.</p>
+              </div>
+            )}
 
             <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:"12px",marginBottom:"12px"}}>
               <div style={{...card({marginBottom:0}),borderLeft:`4px solid ${T.purple}`}}>
