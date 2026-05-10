@@ -95,6 +95,57 @@ function CT({ active, payload, label }) {
   );
 }
 
+// ── EntryForm (fora do App para evitar remount a cada render) ─────────────
+function EntryForm({ type, label, col, list, form, setForm, today, onAdd, onRemove, currentMonth }) {
+  const k = type === "receita" ? "receita" : type === "despesa" ? "despesa" : "invest";
+  return (
+    <div style={card()}>
+      <p style={{ fontSize:"13px", fontWeight:700, color:col, marginBottom:"12px" }}>{label}</p>
+      <div style={{ display:"flex", gap:"8px", marginBottom:"10px", flexWrap:"wrap" }}>
+        <input
+          style={inpStyle}
+          placeholder="Descrição"
+          value={form[k]}
+          onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))}
+        />
+        <input
+          style={{ ...inpStyle, maxWidth:"130px" }}
+          placeholder="R$ Valor"
+          type="number"
+          step="0.01"
+          value={form[k+"Val"]}
+          onChange={e => setForm(f => ({ ...f, [k+"Val"]: e.target.value }))}
+        />
+        <input
+          type="date"
+          style={inpDate}
+          value={form[k+"Date"] || today}
+          onChange={e => setForm(f => ({ ...f, [k+"Date"]: e.target.value }))}
+        />
+        <button style={btnPrimary(col)} onClick={() => onAdd(type)}>+ Adicionar</button>
+      </div>
+      {list.length === 0 ? (
+        <p style={{ color:T.textMuted, fontSize:"13px", textAlign:"center", padding:"16px 0" }}>Nenhum item lançado</p>
+      ) : list.map(item => (
+        <div key={item.id} style={itemRow}>
+          <div>
+            <p style={{ color:T.text, fontSize:"13px", fontWeight:500, margin:0 }}>{item.desc}</p>
+            <p style={{ color:T.textMuted, fontSize:"11px", margin:0 }}>{item.date}</p>
+          </div>
+          <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+            <span style={{ color:col, fontWeight:700, fontSize:"14px" }}>{fmt(item.valor)}</span>
+            <button style={remB} onClick={() => onRemove(currentMonth, type, item.id)}>✕</button>
+          </div>
+        </div>
+      ))}
+      <div style={{ textAlign:"right", borderTop:`1px solid ${T.border}`, paddingTop:"8px", marginTop:"6px" }}>
+        <span style={{ color:T.textSub, fontSize:"12px" }}>Total: </span>
+        <span style={{ color:col, fontWeight:700, fontSize:"14px" }}>{fmt(sumArr(list))}</span>
+      </div>
+    </div>
+  );
+}
+
 // ── Main ────────────────────────────────────────────────────────────────────
 export default function App() {
   const today = new Date().toISOString().split("T")[0];
@@ -200,17 +251,25 @@ export default function App() {
 
   const saveToSupabase = async (payload) => {
     const supabase = createClient();
-    const { error } = await supabase
-      .from("financas_compartilhadas")
-      .upsert({ id: CASAL_ID, updated_at: new Date().toISOString(), ...payload });
-    if (error) throw error;
+    // Garante que arrays são sempre válidos antes de salvar
+    const safe = {
+      id: CASAL_ID,
+      updated_at: new Date().toISOString(),
+      data: Array.isArray(payload.data) ? payload.data : emptyYear(),
+      cartoes: Array.isArray(payload.cartoes) ? payload.cartoes : [],
+      uso_cartoes: Array.isArray(payload.uso_cartoes) ? payload.uso_cartoes : [],
+      pagamentos: (payload.pagamentos && typeof payload.pagamentos === 'object') ? payload.pagamentos : {},
+      sync_url: payload.sync_url || "",
+    };
+    const { error } = await supabase.from("financas_compartilhadas").upsert(safe);
+    if (error) { console.error("Supabase save error:", error); throw error; }
   };
 
   const handleSave = async () => {
     try {
-      await saveToSupabase({ data, cartoes, uso_cartoes: usoCartoes, pagamentos, sync_url: syncUrl });
+      await saveToSupabase({ data: safeData, cartoes, uso_cartoes: usoCartoes, pagamentos, sync_url: syncUrl });
       showToast("✅ Salvo! Lucas verá em instantes.");
-    } catch (_) { showToast("Erro ao salvar", "error"); }
+    } catch (e) { console.error(e); showToast("Erro ao salvar — verifique o console", "error"); }
   };
 
   const saveSyncUrl = async () => {
@@ -221,7 +280,25 @@ export default function App() {
   };
 
   // financials
-  const monthData = data[currentMonth] || { receitas:[], despesas:[], investimentos:[] };
+  // Garante 12 meses válidos SEMPRE — protege contra dados corrompidos do Supabase
+  const safeData = useMemo(() => {
+    const base = emptyYear();
+    if (Array.isArray(data)) {
+      data.forEach((m, i) => {
+        if (i < 12) {
+          base[i] = {
+            month: i,
+            receitas: Array.isArray(m?.receitas) ? m.receitas : [],
+            despesas: Array.isArray(m?.despesas) ? m.despesas : [],
+            investimentos: Array.isArray(m?.investimentos) ? m.investimentos : [],
+          };
+        }
+      });
+    }
+    return base;
+  }, [data]);
+
+  const monthData = safeData[currentMonth];
   const recTotal = sumArr(monthData.receitas);
   const despTotal = sumArr(monthData.despesas);
   const invTotal = sumArr(monthData.investimentos);
@@ -254,7 +331,13 @@ export default function App() {
 
   const getFat = (cid, y, m) => fatMap[`${cid}_${y}_${m}`] || 0;
   const isPago = (cid, y, m) => !!pagamentos[`${cid}_${y}_${m}`];
-  const togglePago = (cid, y, m) => setPagamentos(p => ({ ...p, [`${cid}_${y}_${m}`]: !p[`${cid}_${y}_${m}`] }));
+  const togglePago = async (cid, y, m) => {
+    const newPag = { ...pagamentos, [`${cid}_${y}_${m}`]: !pagamentos[`${cid}_${y}_${m}`] };
+    setPagamentos(newPag);
+    try {
+      await saveToSupabase({ data, cartoes, uso_cartoes: usoCartoes, pagamentos: newPag, sync_url: syncUrl });
+    } catch (_) {}
+  };
 
   const faturasMes = cartoes.reduce((s, c) => s + getFat(c.id, CY, currentMonth), 0);
   const faturasPagas = cartoes.reduce((s, c) => s + (isPago(c.id, CY, currentMonth) ? getFat(c.id, CY, currentMonth) : 0), 0);
@@ -266,11 +349,12 @@ export default function App() {
   const mediaFat = mesesComFat > 0 ? Object.values(fatMap).reduce((s, v) => s + v, 0) / mesesComFat : 0;
 
   const chartData = MS.map((m, i) => ({
+    // safeData garante acesso seguro
     name: m,
-    Receitas: sumArr(data[i]?.receitas),
-    Despesas: sumArr(data[i]?.despesas),
+    Receitas: sumArr(safeData[i].receitas),
+    Despesas: sumArr(safeData[i].despesas),
     Cartões: cartoes.reduce((s, c) => s + getFat(c.id, CY, i), 0),
-    Saldo: sumArr(data[i]?.receitas) - sumArr(data[i]?.despesas) - sumArr(data[i]?.investimentos)
+    Saldo: sumArr(safeData[i].receitas) - sumArr(safeData[i].despesas) - sumArr(safeData[i].investimentos)
       - cartoes.reduce((s, c) => s + (!isPago(c.id, CY, i) ? getFat(c.id, CY, i) : 0), 0),
   }));
 
@@ -313,7 +397,7 @@ export default function App() {
   const processLote = () => {
     const lines = loteText.split("\n").filter(l => l.trim());
     let added = 0;
-    const nd = data.map(m => ({ ...m, receitas:[...m.receitas], despesas:[...m.despesas], investimentos:[...m.investimentos] }));
+    const nd = safeData.map(m => ({ ...m, receitas:[...m.receitas], despesas:[...m.despesas], investimentos:[...m.investimentos] }));
     lines.forEach(line => {
       const [tipo, desc, val, dateStr] = line.split(";").map(p => p.trim());
       const valor = parseFloat((val||"0").replace(",","."));
@@ -384,7 +468,7 @@ export default function App() {
   const confirmarImport = async () => {
     if (!syncPreview) return;
     const { receitas, despesas, investimentos, month } = syncPreview;
-    const novoData = data.map((m, i) => {
+    const novoData = safeData.map((m, i) => {
       if (i !== month) return m;
       return {
         ...m,
@@ -397,46 +481,15 @@ export default function App() {
     // Salva automaticamente no Supabase após importar
     try {
       await saveToSupabase({ data: novoData, cartoes, uso_cartoes: usoCartoes, pagamentos, sync_url: syncUrl });
+      // Update local state so dashboard reflects immediately
+      setCurrentMonth(syncPreview.month);
     } catch (_) {}
     setSyncPreview(null);
     setSyncStatus({ ok:true, msg:`✅ ${MONTHS[month]} importado e salvo! ${receitas.length} receitas • ${despesas.length} despesas • ${investimentos.length} investimentos` });
     showToast(`✅ Dados de ${MONTHS[month]} salvos com sucesso!`);
   };
 
-  // EntryForm
-  const EntryForm = ({ type, label, col, lightCol }) => {
-    const k = type === "receita" ? "receita" : type === "despesa" ? "despesa" : "invest";
-    const list = type === "receita" ? monthData.receitas : type === "despesa" ? monthData.despesas : monthData.investimentos;
-    return (
-      <div style={card()}>
-        <p style={{ fontSize:"13px", fontWeight:700, color:col, marginBottom:"12px" }}>{label}</p>
-        <div style={{ display:"flex", gap:"8px", marginBottom:"10px", flexWrap:"wrap" }}>
-          <input style={inpStyle} placeholder="Descrição" value={form[k]} onChange={e => setForm(f => ({ ...f, [k]:e.target.value }))} />
-          <input style={{ ...inpStyle, maxWidth:"130px" }} placeholder="R$ Valor" value={form[k+"Val"]} onChange={e => setForm(f => ({ ...f, [k+"Val"]:e.target.value }))} />
-          <input type="date" style={inpDate} value={form[k+"Date"]||today} onChange={e => setForm(f => ({ ...f, [k+"Date"]:e.target.value }))} />
-          <button style={btnPrimary(col)} onClick={() => addItem(type)}>+ Adicionar</button>
-        </div>
-        {list.length === 0 ? (
-          <p style={{ color:T.textMuted, fontSize:"13px", textAlign:"center", padding:"16px 0" }}>Nenhum item lançado</p>
-        ) : list.map(item => (
-          <div key={item.id} style={itemRow}>
-            <div>
-              <p style={{ color:T.text, fontSize:"13px", fontWeight:500, margin:0 }}>{item.desc}</p>
-              <p style={{ color:T.textMuted, fontSize:"11px", margin:0 }}>{item.date}</p>
-            </div>
-            <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
-              <span style={{ color:col, fontWeight:700, fontSize:"14px" }}>{fmt(item.valor)}</span>
-              <button style={remB} onClick={() => removeItem(currentMonth, type, item.id)}>✕</button>
-            </div>
-          </div>
-        ))}
-        <div style={{ textAlign:"right", borderTop:`1px solid ${T.border}`, paddingTop:"8px", marginTop:"6px" }}>
-          <span style={{ color:T.textSub, fontSize:"12px" }}>Total: </span>
-          <span style={{ color:col, fontWeight:700, fontSize:"14px" }}>{fmt(sumArr(list))}</span>
-        </div>
-      </div>
-    );
-  };
+  // EntryForm moved outside App — see below
 
   const isMobile = useIsMobile();
   const sw = isMobile ? "0px" : sidebarOpen ? "220px" : "64px";
@@ -670,7 +723,7 @@ export default function App() {
               <p style={{ fontSize:"13px", fontWeight:600, color:T.text, marginBottom:"14px" }}>📅 Resumo {CY}</p>
               <div style={{ display:"grid", gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)", gap:"8px" }}>
                 {MONTHS.map((m, i) => {
-                  const r = sumArr(data[i]?.receitas), d = sumArr(data[i]?.despesas), inv = sumArr(data[i]?.investimentos);
+                  const r = sumArr(safeData[i].receitas), d = sumArr(safeData[i].despesas), inv = sumArr(safeData[i].investimentos);
                   const cart = cartoes.reduce((s, c) => s + getFat(c.id, CY, i), 0);
                   const s = r - d - inv - cartoes.reduce((s2, c) => s2 + (!isPago(c.id, CY, i) ? getFat(c.id, CY, i) : 0), 0);
                   const active = i === currentMonth;
@@ -699,9 +752,15 @@ export default function App() {
             <div style={{ ...card({ padding:"12px 16px", marginBottom:"14px" }), background:T.purpleLight, border:`1px solid #DDD6FE` }}>
               <p style={{ color:T.purple, fontSize:"13px", margin:0 }}>📅 Lançamentos de <strong>{MONTHS[currentMonth]} {CY}</strong></p>
             </div>
-            <EntryForm type="receita" label="📥 Receitas" col={T.green} lightCol={T.greenLight} />
-            <EntryForm type="despesa" label="📤 Despesas" col={T.red} lightCol={T.redLight} />
-            <EntryForm type="investimento" label="💎 Investimentos" col={T.blue} lightCol={T.blueLight} />
+            <EntryForm type="receita" label="📥 Receitas" col={T.green}
+              list={monthData.receitas} form={form} setForm={setForm}
+              today={today} onAdd={addItem} onRemove={removeItem} currentMonth={currentMonth} />
+            <EntryForm type="despesa" label="📤 Despesas" col={T.red}
+              list={monthData.despesas} form={form} setForm={setForm}
+              today={today} onAdd={addItem} onRemove={removeItem} currentMonth={currentMonth} />
+            <EntryForm type="investimento" label="💎 Investimentos" col={T.blue}
+              list={monthData.investimentos} form={form} setForm={setForm}
+              today={today} onAdd={addItem} onRemove={removeItem} currentMonth={currentMonth} />
           </div>
         )}
 
@@ -735,7 +794,7 @@ export default function App() {
                   </thead>
                   <tbody>
                     {MONTHS.map((m, i) => {
-                      const r = sumArr(data[i]?.receitas), d = sumArr(data[i]?.despesas), inv = sumArr(data[i]?.investimentos);
+                      const r = sumArr(safeData[i].receitas), d = sumArr(safeData[i].despesas), inv = sumArr(safeData[i].investimentos);
                       const cart = cartoes.reduce((s, c) => s + getFat(c.id, CY, i), 0);
                       const s = r - d - inv - cartoes.reduce((s2, c) => s2 + (!isPago(c.id, CY, i) ? getFat(c.id, CY, i) : 0), 0);
                       return (
@@ -754,15 +813,15 @@ export default function App() {
                     <tr style={{ borderTop:`2px solid ${T.borderStrong}`, background:T.surfaceAlt }}>
                       <td style={{ ...td, fontWeight:700 }}>TOTAL</td>
                       {[
-                        data.reduce((s,m)=>s+sumArr(m.receitas),0),
-                        data.reduce((s,m)=>s+sumArr(m.despesas),0),
-                        data.reduce((s,m)=>s+sumArr(m.investimentos),0),
+                        safeData.reduce((s,m)=>s+sumArr(m.receitas),0),
+                        safeData.reduce((s,m)=>s+sumArr(m.despesas),0),
+                        safeData.reduce((s,m)=>s+sumArr(m.investimentos),0),
                         yrMs.reduce((s,i)=>s+cartoes.reduce((ss,c)=>ss+getFat(c.id,CY,i),0),0),
                       ].map((v, i) => (
                         <td key={i} style={{ ...td, textAlign:"right", color:[T.green,T.red,T.blue,T.amber][i], fontWeight:700 }}>{fmt(v)}</td>
                       ))}
                       <td style={{ ...td, textAlign:"right", fontWeight:700, color:T.purple }}>
-                        {fmt(data.reduce((s,m,i)=>s+sumArr(m.receitas)-sumArr(m.despesas)-sumArr(m.investimentos)-cartoes.reduce((ss,c)=>ss+(!isPago(c.id,CY,i)?getFat(c.id,CY,i):0),0),0))}
+                        {fmt(safeData.reduce((s,m,i)=>s+sumArr(m.receitas)-sumArr(m.despesas)-sumArr(m.investimentos)-cartoes.reduce((ss,c)=>ss+(!isPago(c.id,CY,i)?getFat(c.id,CY,i):0),0),0))}
                       </td>
                     </tr>
                   </tfoot>
@@ -1134,7 +1193,7 @@ export default function App() {
               <button style={remB} onClick={() => setShowSearch(false)}>✕ Fechar</button>
             </div>
             <input style={{ ...inpStyle, marginBottom:"10px", maxWidth:"100%" }} placeholder="Pesquisar descrição..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-            {data.flatMap((m, mi) => [
+            {safeData.flatMap((m, mi) => [
               ...m.receitas.map(x => ({ ...x, type:"receita", mi })),
               ...m.despesas.map(x => ({ ...x, type:"despesa", mi })),
               ...m.investimentos.map(x => ({ ...x, type:"investimento", mi })),
