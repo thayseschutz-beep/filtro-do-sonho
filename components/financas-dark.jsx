@@ -96,44 +96,36 @@ function CT({ active, payload, label }) {
 }
 
 // ── EntryForm (fora do App para evitar remount a cada render) ─────────────
-function EntryForm({ type, label, col, list, form, setForm, today, onAdd, onRemove, currentMonth }) {
+function EntryForm({ type, label, col, list, form, setForm, today, onAdd, onRemove, onEdit, currentMonth }) {
   const k = type === "receita" ? "receita" : type === "despesa" ? "despesa" : "invest";
+  const editBtnStyle = {
+    background:"#EEF2FF", border:"1px solid #C7D2FE", color:"#4F46E5",
+    borderRadius:"6px", cursor:"pointer", padding:"3px 8px", fontSize:"11px", fontWeight:600
+  };
   return (
     <div style={card()}>
       <p style={{ fontSize:"13px", fontWeight:700, color:col, marginBottom:"12px" }}>{label}</p>
       <div style={{ display:"flex", gap:"8px", marginBottom:"10px", flexWrap:"wrap" }}>
-        <input
-          style={inpStyle}
-          placeholder="Descrição"
-          value={form[k]}
-          onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))}
-        />
-        <input
-          style={{ ...inpStyle, maxWidth:"130px" }}
-          placeholder="R$ Valor"
-          type="number"
-          step="0.01"
-          value={form[k+"Val"]}
-          onChange={e => setForm(f => ({ ...f, [k+"Val"]: e.target.value }))}
-        />
-        <input
-          type="date"
-          style={inpDate}
-          value={form[k+"Date"] || today}
-          onChange={e => setForm(f => ({ ...f, [k+"Date"]: e.target.value }))}
-        />
+        <input style={inpStyle} placeholder="Descrição" value={form[k]}
+          onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))} />
+        <input style={{ ...inpStyle, maxWidth:"130px" }} placeholder="R$ Valor"
+          type="number" step="0.01" value={form[k+"Val"]}
+          onChange={e => setForm(f => ({ ...f, [k+"Val"]: e.target.value }))} />
+        <input type="date" style={inpDate} value={form[k+"Date"] || today}
+          onChange={e => setForm(f => ({ ...f, [k+"Date"]: e.target.value }))} />
         <button style={btnPrimary(col)} onClick={() => onAdd(type)}>+ Adicionar</button>
       </div>
       {list.length === 0 ? (
         <p style={{ color:T.textMuted, fontSize:"13px", textAlign:"center", padding:"16px 0" }}>Nenhum item lançado</p>
       ) : list.map(item => (
         <div key={item.id} style={itemRow}>
-          <div>
+          <div style={{ flex:1 }}>
             <p style={{ color:T.text, fontSize:"13px", fontWeight:500, margin:0 }}>{item.desc}</p>
             <p style={{ color:T.textMuted, fontSize:"11px", margin:0 }}>{item.date}</p>
           </div>
-          <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:"6px" }}>
             <span style={{ color:col, fontWeight:700, fontSize:"14px" }}>{fmt(item.valor)}</span>
+            <button style={editBtnStyle} onClick={() => onEdit(item, type, currentMonth)}>✏️</button>
             <button style={remB} onClick={() => onRemove(currentMonth, type, item.id)}>✕</button>
           </div>
         </div>
@@ -344,6 +336,14 @@ export default function App() {
   const faturasEmAberto = faturasMes - faturasPagas;
   const saldoReal = saldo - faturasEmAberto;
   const totalAtrasado = yrMs.slice(0, nowM).reduce((s, m) => s + cartoes.reduce((ss, c) => ss + (!isPago(c.id, CY, m) ? getFat(c.id, CY, m) : 0), 0), 0);
+  // Total anual de faturas + próximas faturas (meses com valor > 0)
+  const totalAnualCartoes = yrMs.reduce((s, m) => s + cartoes.reduce((ss, c) => ss + getFat(c.id, CY, m), 0), 0);
+  const totalAbertoPendente = yrMs.reduce((s, m) => s + cartoes.reduce((ss, c) => ss + (!isPago(c.id, CY, m) ? getFat(c.id, CY, m) : 0), 0), 0);
+  const proximasFaturas = yrMs
+    .filter(m => m >= nowM)
+    .map(m => ({ month: m, total: cartoes.reduce((s, c) => s + getFat(c.id, CY, m), 0), pago: cartoes.every(c => getFat(c.id, CY, m) === 0 || isPago(c.id, CY, m)) }))
+    .filter(f => f.total > 0)
+    .slice(0, 4);
   const totalGastoCartoes = usoCartoes.reduce((s, u) => s + u.valor, 0);
   const mesesComFat = new Set(Object.keys(fatMap).map(k => k.split("_").slice(1).join("_"))).size;
   const mediaFat = mesesComFat > 0 ? Object.values(fatMap).reduce((s, v) => s + v, 0) / mesesComFat : 0;
@@ -377,6 +377,27 @@ export default function App() {
   const removeItem = (mi, type, id) => {
     const key = type === "receita" ? "receitas" : type === "despesa" ? "despesas" : "investimentos";
     setData(d => d.map((m, i) => i === mi ? { ...m, [key]: m[key].filter(x => x.id !== id) } : m));
+  };
+
+  const [editingItem, setEditingItem] = useState(null);
+  // editingItem = { id, type, monthIdx, desc, valor, date }
+
+  const startEdit = (item, type, monthIdx) => {
+    setEditingItem({ ...item, type, monthIdx, editDesc: item.desc, editValor: String(item.valor), editDate: item.date });
+  };
+
+  const saveEdit = () => {
+    if (!editingItem) return;
+    const { id, type, monthIdx, editDesc, editValor, editDate } = editingItem;
+    const key = type === "receita" ? "receitas" : type === "despesa" ? "despesas" : "investimentos";
+    const val = parseFloat(editValor.replace(",", "."));
+    if (!editDesc || !val) { showToast("Preencha descrição e valor", "error"); return; }
+    setData(d => d.map((m, i) => i === monthIdx ? {
+      ...m,
+      [key]: m[key].map(x => x.id === id ? { ...x, desc: editDesc, valor: val, date: editDate } : x)
+    } : m));
+    setEditingItem(null);
+    showToast("Item atualizado!");
   };
 
   const addCartao = () => {
@@ -627,6 +648,47 @@ export default function App() {
               </div>
             </div>
 
+            {/* Cartões — Visão Anual no Dashboard */}
+            {cartoes.length > 0 && (
+              <div style={{ ...card({ marginBottom:"14px" }), background: totalAbertoPendente > 0 ? "#FFFBEB" : T.surface, border:`1px solid ${totalAbertoPendente > 0 ? "#FDE68A" : T.border}` }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px", flexWrap:"wrap", gap:"8px" }}>
+                  <p style={{ fontSize:"13px", fontWeight:700, color:T.text, margin:0 }}>💳 Cartões — Visão Anual</p>
+                  <div style={{ display:"flex", gap:"14px" }}>
+                    <span style={{ fontSize:"12px", color:T.textSub }}>Total ano: <strong style={{ color:T.amber }}>{fmt(totalAnualCartoes)}</strong></span>
+                    <span style={{ fontSize:"12px", color:T.textSub }}>Pendente: <strong style={{ color: totalAbertoPendente > 0 ? T.red : T.green }}>{fmt(totalAbertoPendente)}</strong></span>
+                  </div>
+                </div>
+                {proximasFaturas.length === 0 ? (
+                  <p style={{ color:T.textMuted, fontSize:"12px" }}>✓ Sem faturas pendentes nos próximos meses.</p>
+                ) : (
+                  <div style={{ display:"flex", gap:"8px", flexWrap:"wrap" }}>
+                    {proximasFaturas.map(f => (
+                      <div key={f.month} style={{ background: f.pago ? T.greenLight : T.amberLight, border:`1px solid ${f.pago ? "#BBF7D0" : "#FDE68A"}`, borderRadius:"10px", padding:"10px 14px", minWidth:"110px" }}>
+                        <p style={{ fontSize:"11px", fontWeight:700, color: f.pago ? T.green : T.amber, margin:"0 0 3px" }}>{MONTHS[f.month]}</p>
+                        <p style={{ fontSize:"16px", fontWeight:700, color: f.pago ? T.green : T.amber, margin:0 }}>{fmt(f.total)}</p>
+                        <p style={{ fontSize:"10px", color:T.textSub, margin:"2px 0 0" }}>{f.pago ? "✓ Pago" : "Pendente"}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {faturasMes > 0 && (
+                  <div style={{ marginTop:"10px", paddingTop:"10px", borderTop:`1px solid ${T.border}`, display:"flex", gap:"8px", flexWrap:"wrap", alignItems:"center" }}>
+                    <span style={{ fontSize:"12px", color:T.textSub }}>Fatura de {MONTHS[currentMonth]}:</span>
+                    {cartoes.map((c, ci) => {
+                      const v = getFat(c.id, CY, currentMonth);
+                      const pg = isPago(c.id, CY, currentMonth);
+                      return v > 0 ? (
+                        <div key={c.id} style={{ display:"flex", alignItems:"center", gap:"5px", background: pg ? T.greenLight : T.redLight, border:`1px solid ${pg ? "#BBF7D0" : "#FECACA"}`, borderRadius:"7px", padding:"4px 10px" }}>
+                          <span style={{ fontSize:"11px", fontWeight:600, color: pg ? T.green : T.red }}>{c.nome}: {fmt(v)}</span>
+                          {!pg && <button style={{ background:T.green, border:"none", color:"#fff", borderRadius:"4px", padding:"1px 6px", fontSize:"10px", fontWeight:700, cursor:"pointer" }} onClick={() => togglePago(c.id, CY, currentMonth)}>Pagar</button>}
+                        </div>
+                      ) : null;
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Charts */}
             <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr", gap:"12px", marginBottom:"14px" }}>
               <div style={{ ...card({ marginBottom:0 }) }}>
@@ -754,13 +816,13 @@ export default function App() {
             </div>
             <EntryForm type="receita" label="📥 Receitas" col={T.green}
               list={monthData.receitas} form={form} setForm={setForm}
-              today={today} onAdd={addItem} onRemove={removeItem} currentMonth={currentMonth} />
+              today={today} onAdd={addItem} onRemove={removeItem} onEdit={startEdit} currentMonth={currentMonth} />
             <EntryForm type="despesa" label="📤 Despesas" col={T.red}
               list={monthData.despesas} form={form} setForm={setForm}
-              today={today} onAdd={addItem} onRemove={removeItem} currentMonth={currentMonth} />
+              today={today} onAdd={addItem} onRemove={removeItem} onEdit={startEdit} currentMonth={currentMonth} />
             <EntryForm type="investimento" label="💎 Investimentos" col={T.blue}
               list={monthData.investimentos} form={form} setForm={setForm}
-              today={today} onAdd={addItem} onRemove={removeItem} currentMonth={currentMonth} />
+              today={today} onAdd={addItem} onRemove={removeItem} onEdit={startEdit} currentMonth={currentMonth} />
           </div>
         )}
 
@@ -1274,6 +1336,45 @@ export default function App() {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ── EDIT MODAL ── */}
+      {editingItem && (
+        <div style={{ position:"fixed", inset:0, zIndex:500, background:"rgba(0,0,0,0.4)", backdropFilter:"blur(4px)", display:"flex", alignItems:"center", justifyContent:"center" }}
+          onClick={() => setEditingItem(null)}>
+          <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:"16px", padding:"24px", width:"480px", maxWidth:"92vw", boxShadow:shadowMd }}
+            onClick={e => e.stopPropagation()}>
+            <h3 style={{ color:T.text, margin:"0 0 16px", fontSize:"16px" }}>
+              ✏️ Editar {editingItem.type === "receita" ? "Receita" : editingItem.type === "despesa" ? "Despesa" : "Investimento"}
+            </h3>
+            <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
+              <div>
+                <label style={{ fontSize:"12px", color:T.textSub, display:"block", marginBottom:"4px" }}>Descrição</label>
+                <input style={{ ...inpStyle, width:"100%", boxSizing:"border-box" }}
+                  value={editingItem.editDesc}
+                  onChange={e => setEditingItem(ei => ({ ...ei, editDesc: e.target.value }))} />
+              </div>
+              <div style={{ display:"flex", gap:"10px" }}>
+                <div style={{ flex:1 }}>
+                  <label style={{ fontSize:"12px", color:T.textSub, display:"block", marginBottom:"4px" }}>Valor (R$)</label>
+                  <input type="number" step="0.01" style={{ ...inpStyle, width:"100%", boxSizing:"border-box" }}
+                    value={editingItem.editValor}
+                    onChange={e => setEditingItem(ei => ({ ...ei, editValor: e.target.value }))} />
+                </div>
+                <div style={{ flex:1 }}>
+                  <label style={{ fontSize:"12px", color:T.textSub, display:"block", marginBottom:"4px" }}>Data</label>
+                  <input type="date" style={{ ...inpDate, width:"100%", boxSizing:"border-box" }}
+                    value={editingItem.editDate}
+                    onChange={e => setEditingItem(ei => ({ ...ei, editDate: e.target.value }))} />
+                </div>
+              </div>
+            </div>
+            <div style={{ display:"flex", gap:"8px", marginTop:"18px", justifyContent:"flex-end" }}>
+              <button style={btnPrimary(T.green)} onClick={saveEdit}>✅ Salvar alteração</button>
+              <button style={btnGhost} onClick={() => setEditingItem(null)}>Cancelar</button>
+            </div>
+          </div>
         </div>
       )}
 
