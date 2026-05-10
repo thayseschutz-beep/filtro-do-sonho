@@ -278,6 +278,8 @@ export default function App(){
   const [syncStatus, setSyncStatus] = useState(null);
   const [syncPreview, setSyncPreview] = useState(null);
   const [syncing, setSyncing] = useState(false);
+  const [faturaDetalhe, setFaturaDetalhe] = useState(null); // {cartaoId, month, year}
+  const [editUso, setEditUso] = useState(null); // for editing a credit card purchase
   const [showLote, setShowLote] = useState(false);
   const [loteText, setLoteText] = useState("");
   const [showImport, setShowImport] = useState(false);
@@ -364,12 +366,16 @@ export default function App(){
   },[usoCartoes,cartoes]);
 
   const getFat=(cid,y,m)=>fatMap[`${cid}_${y}_${m}`]||0;
-  const isPago=(cid,y,m)=>!!pagamentos[`${cid}_${y}_${m}`];
-  const togglePago=async(cid,y,m)=>{
-    const np={...pagamentos,[`${cid}_${y}_${m}`]:!pagamentos[`${cid}_${y}_${m}`]};
+  const isPago=(cid,y,m)=>{const v=pagamentos[`${cid}_${y}_${m}`];return v===true||v?.pago===true;};
+  const togglePago=async(cid,y,m,dataPag)=>{
+    const key=`${cid}_${y}_${m}`;
+    const jaEhPago=!!pagamentos[key]?.pago||pagamentos[key]===true;
+    const np={...pagamentos,[key]:jaEhPago?false:{pago:true,data:dataPag||today}};
     setPagamentos(np);
     try{await saveToSupa({data:safeData,cartoes,uso_cartoes:usoCartoes,pagamentos:np,sync_url:syncUrl,cadastros});}catch(_){}
   };
+  const isFaturaPaga=(cid,y,m)=>{const v=pagamentos[`${cid}_${y}_${m}`];return v===true||v?.pago===true;};
+  const getDataPagamento=(cid,y,m)=>{const v=pagamentos[`${cid}_${y}_${m}`];return v?.data||"";};
 
   const faturasMes=cartoes.reduce((s,c)=>s+getFat(c.id,CY,currentMonth),0);
   const faturasAbertas=faturasMes-cartoes.reduce((s,c)=>s+(isPago(c.id,CY,currentMonth)?getFat(c.id,CY,currentMonth):0),0);
@@ -515,21 +521,23 @@ export default function App(){
         </div>
         <nav style={{flex:1,padding:"10px 8px",display:"flex",flexDirection:"column",gap:"2px",overflowY:"auto"}}>
           {navItems.map(n=>(
-            <div key={n.key} style={navI(activeSection===n.key)} onClick={()=>setActiveSection(n.key)}>
-              <span style={{fontSize:"17px",flexShrink:0}}>{n.icon}</span>
-              {sidebarOpen&&<span>{n.label}</span>}
+            <div key={n.key}>
+              <div style={navI(activeSection===n.key)} onClick={()=>setActiveSection(n.key)}>
+                <span style={{fontSize:"17px",flexShrink:0}}>{n.icon}</span>
+                {sidebarOpen&&<span>{n.label}</span>}
+              </div>
+              {n.key==="cartoes"&&activeSection==="cartoes"&&sidebarOpen&&(
+                <div style={{marginLeft:"8px",marginTop:"2px",display:"flex",flexDirection:"column",gap:"1px"}}>
+                  {cardSubNav.map(([k,ic,l])=><div key={k} style={subNavI(cardSub===k)} onClick={e=>{e.stopPropagation();setCardSub(k);}}><span style={{fontSize:"13px"}}>{ic}</span><span>{l}</span></div>)}
+                </div>
+              )}
+              {n.key==="cadastros"&&activeSection==="cadastros"&&sidebarOpen&&(
+                <div style={{marginLeft:"8px",marginTop:"2px",display:"flex",flexDirection:"column",gap:"1px"}}>
+                  {cadSubNav.map(([k,ic,l])=><div key={k} style={subNavI(cadSub===k)} onClick={e=>{e.stopPropagation();setCadSub(k);}}><span style={{fontSize:"13px"}}>{ic}</span><span>{l}</span></div>)}
+                </div>
+              )}
             </div>
           ))}
-          {activeSection==="cartoes"&&sidebarOpen&&(
-            <div style={{marginLeft:"8px",marginTop:"2px",display:"flex",flexDirection:"column",gap:"1px"}}>
-              {cardSubNav.map(([k,ic,l])=><div key={k} style={subNavI(cardSub===k)} onClick={e=>{e.stopPropagation();setCardSub(k);}}><span>{ic}</span><span>{l}</span></div>)}
-            </div>
-          )}
-          {activeSection==="cadastros"&&sidebarOpen&&(
-            <div style={{marginLeft:"8px",marginTop:"2px",display:"flex",flexDirection:"column",gap:"1px"}}>
-              {cadSubNav.map(([k,ic,l])=><div key={k} style={subNavI(cadSub===k)} onClick={e=>{e.stopPropagation();setCadSub(k);}}><span>{ic}</span><span>{l}</span></div>)}
-            </div>
-          )}
         </nav>
         <div style={{padding:"10px 8px",borderTop:`1px solid ${T.border}`}}>
           <div style={{...navI(false),justifyContent:sidebarOpen?"flex-start":"center"}} onClick={()=>setSidebarOpen(s=>!s)}>
@@ -843,7 +851,16 @@ export default function App(){
                 </div>
                 {usoCartoes.length>0&&(
                   <div style={card()}>
-                    <p style={{fontSize:"13px",fontWeight:600,color:T.text,marginBottom:"12px"}}>📋 Histórico ({usoCartoes.length} compras)</p>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px",flexWrap:"wrap",gap:"8px"}}>
+                      <p style={{fontSize:"13px",fontWeight:600,color:T.text,margin:0}}>📋 Histórico ({usoCartoes.length} compras)</p>
+                      <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
+                        <select style={{...selS,width:"auto",fontSize:"12px"}} value={faturaDetalhe?.cartaoId||""} onChange={e=>setFaturaDetalhe(e.target.value?{cartaoId:e.target.value,month:currentMonth,year:CY,faturaTab:"uso"}:null)}>
+                          <option value="">Filtrar por cartão</option>
+                          {cartoes.map(c=><option key={c.id} value={c.id}>{c.nome}</option>)}
+                        </select>
+                        {faturaDetalhe?.cartaoId&&<button style={{...btnG,fontSize:"11px",padding:"4px 10px"}} onClick={()=>setFaturaDetalhe(null)}>✕ Limpar</button>}
+                      </div>
+                    </div>
                     <div style={{overflowX:"auto"}}>
                       <table style={{width:"100%",borderCollapse:"collapse",fontSize:"12px"}}>
                         <thead><tr>{["Cartão","Data","Descrição","Valor","Parcelas","Valor/Parc.",""].map(h=><th key={h} style={{padding:"8px 10px",textAlign:"left",color:T.textSub,fontWeight:600,borderBottom:`1px solid ${T.border}`}}>{h}</th>)}</tr></thead>
@@ -855,7 +872,10 @@ export default function App(){
                             <td style={{padding:"8px 10px",color:T.amber,fontWeight:600}}>{fmt(u.valor)}</td>
                             <td style={{padding:"8px 10px",color:T.purple}}>{u.parcelas}x</td>
                             <td style={{padding:"8px 10px",color:T.blue}}>{fmt(u.valorParcela)}</td>
-                            <td style={{padding:"8px 10px"}}><button style={remB} onClick={()=>setUsoCartoes(u2=>u2.filter(x=>x.id!==u.id))}>✕</button></td>
+                            <td style={{padding:"8px 10px",display:"flex",gap:"4px",alignItems:"center"}}>
+                              <button style={editB} onClick={()=>setEditUso({...u})}>✏️</button>
+                              <button style={remB} onClick={()=>{if(confirm(`Remover "${u.descricao}"?`))setUsoCartoes(u2=>u2.filter(x=>x.id!==u.id));}}>✕</button>
+                            </td>
                           </tr>
                         );})}
                         </tbody>
@@ -880,7 +900,44 @@ export default function App(){
                     <table style={{width:"100%",borderCollapse:"collapse",fontSize:"12px"}}>
                       <thead><tr><th style={{padding:"8px 10px",textAlign:"left",color:T.textSub,fontWeight:600,borderBottom:`1px solid ${T.border}`,minWidth:"150px"}}>Cartão</th>{faturaTab==="apagar"&&<th style={{padding:"8px 10px",color:T.textSub,fontWeight:600,borderBottom:`1px solid ${T.border}`,minWidth:"90px"}}>Total Ano</th>}{MS.map(m=><th key={m} style={{padding:"8px 10px",color:T.textSub,fontWeight:600,borderBottom:`1px solid ${T.border}`,minWidth:"75px"}}>{m}</th>)}</tr></thead>
                       <tbody>
-                        {faturaTab==="apagar"&&<tr style={{background:T.purpleLight}}>
+                        {faturaDetalhe&&faturaDetalhe.faturaTab===faturaTab&&(
+                      <tr>
+                        <td colSpan={15} style={{padding:0}}>
+                          <div style={{background:"#F0F9FF",border:"1px solid #BAE6FD",borderRadius:"10px",padding:"14px",margin:"6px 10px"}}>
+                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}}>
+                              <p style={{fontSize:"13px",fontWeight:700,color:T.blue,margin:0}}>
+                                🔍 Lançamentos na fatura — {cartoes.find(c=>c.id===faturaDetalhe.cartaoId)?.nome} | {MONTHS[faturaDetalhe.month]} {CY}
+                              </p>
+                              <button style={{...btnG,padding:"3px 10px",fontSize:"11px"}} onClick={()=>setFaturaDetalhe(null)}>✕ Fechar</button>
+                            </div>
+                            {usoCartoes.filter(u=>u.cartaoId===faturaDetalhe.cartaoId&&getInstMonths(u).some(im=>im.year===CY&&im.month===faturaDetalhe.month)).map(u=>{
+                              const parcelaDoMes=getInstMonths(u).find(im=>im.year===CY&&im.month===faturaDetalhe.month);
+                              const numParcela=getInstMonths(u).findIndex(im=>im.year===CY&&im.month===faturaDetalhe.month)+1;
+                              return(
+                                <div key={u.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",borderRadius:"8px",marginBottom:"5px",background:T.surface,border:`1px solid ${T.border}`,flexWrap:"wrap",gap:"8px"}}>
+                                  <div>
+                                    <p style={{color:T.text,fontSize:"13px",fontWeight:500,margin:0}}>{u.descricao}</p>
+                                    <p style={{color:T.textMuted,fontSize:"11px",margin:"2px 0 0"}}>Compra: {u.data} • Parcela {numParcela}/{u.parcelas} • Total: {fmt(u.valor)}</p>
+                                  </div>
+                                  <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+                                    <span style={{color:T.amber,fontWeight:700,fontSize:"14px"}}>{fmt(u.valorParcela)}</span>
+                                    <button style={editB} onClick={()=>{
+                                      const novoDesc=prompt("Nova descrição:",u.descricao);
+                                      if(novoDesc&&novoDesc!==u.descricao) setUsoCartoes(us=>us.map(x=>x.id===u.id?{...x,descricao:novoDesc}:x));
+                                    }}>✏️</button>
+                                    <button style={remB} onClick={()=>{if(confirm(`Remover "${u.descricao}"?`)) setUsoCartoes(us=>us.filter(x=>x.id!==u.id));}}>✕</button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            {usoCartoes.filter(u=>u.cartaoId===faturaDetalhe.cartaoId&&getInstMonths(u).some(im=>im.year===CY&&im.month===faturaDetalhe.month)).length===0&&(
+                              <p style={{color:T.textMuted,fontSize:"13px",textAlign:"center",padding:"12px 0"}}>Nenhuma compra encontrada para este mês.</p>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    {faturaTab==="apagar"&&<tr style={{background:T.purpleLight}}>
                           <td style={{padding:"8px 10px",fontWeight:700,color:T.purple}}>Total</td>
                           <td style={{padding:"8px 10px",fontWeight:700,color:T.purple}}>{fmt(cartoes.reduce((s,c)=>s+yrMs.reduce((ss,m)=>ss+getFat(c.id,CY,m),0),0))}</td>
                           {yrMs.map(m=>{const t=cartoes.reduce((s,c)=>s+getFat(c.id,CY,m),0);return<td key={m} style={{padding:"8px 10px",color:t>0?T.red:T.textMuted,fontWeight:t>0?700:400}}>{t>0?fmt(t):"—"}</td>;})}
@@ -892,7 +949,13 @@ export default function App(){
                             {yrMs.map(m=>{
                               const v=getFat(c.id,CY,m),pg=isPago(c.id,CY,m),past=m<nowM;
                               return <td key={m} style={{padding:"8px 10px"}}>
-                                {faturaTab==="apagar"&&v>0?<button style={{background:pg?"#DCFCE7":"#FEE2E2",border:`1px solid ${pg?"#BBF7D0":"#FECACA"}`,color:pg?T.green:T.red,borderRadius:"5px",padding:"2px 8px",fontSize:"10px",fontWeight:700,cursor:"pointer"}} onClick={()=>togglePago(c.id,CY,m)}>{pg?"✓ Pago":fmt(v)}</button>:
+                                {faturaTab==="apagar"&&v>0?<div style={{display:"flex",flexDirection:"column",gap:"3px",alignItems:"center"}}>
+                                  <button style={{background:pg?"#DCFCE7":"#FEE2E2",border:`1px solid ${pg?"#BBF7D0":"#FECACA"}`,color:pg?T.green:T.red,borderRadius:"5px",padding:"2px 8px",fontSize:"10px",fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}} onClick={()=>{
+                                    if(pg){togglePago(c.id,CY,m);}
+                                    else{const d=prompt(`Data de pagamento (${MONTHS[m]}):`,today);if(d!==null)togglePago(c.id,CY,m,d||today);}
+                                  }}>{pg?`✓ ${getDataPagamento(c.id,CY,m)||"Pago"}`:fmt(v)}</button>
+                                  <button style={{background:T.blueLight,border:`1px solid #BAE6FD`,color:T.blue,borderRadius:"4px",padding:"1px 6px",fontSize:"9px",cursor:"pointer"}} onClick={()=>setFaturaDetalhe({cartaoId:c.id,month:m,year:CY,faturaTab})}>🔍 ver</button>
+                                </div>:
                                 faturaTab==="pagamentos"&&pg?<span style={{color:T.green,fontWeight:700,fontSize:"11px"}}>✓ {fmt(v)}</span>:
                                 faturaTab==="inadimplencias"&&v>0&&!pg?<span style={{color:past?T.red:T.amber,fontWeight:700,fontSize:"11px",background:past?"#FEE2E2":"#FEF3C7",padding:"2px 6px",borderRadius:"4px"}}>{fmt(-v)}</span>:
                                 "—"}
@@ -1133,6 +1196,35 @@ export default function App(){
             <div style={{display:"flex",gap:"8px",marginTop:"14px",justifyContent:"flex-end"}}>
               <button style={btnP(T.purple)} onClick={()=>{try{const imp=JSON.parse(document.getElementById("importArea").value);if(imp.data&&Array.isArray(imp.data)){setData(imp.data);if(imp.cartoes)setCartoes(imp.cartoes);if(imp.usoCartoes)setUsoCartoes(imp.usoCartoes);if(imp.pagamentos)setPagamentos(imp.pagamentos);if(imp.cadastros)setCadastros({...emptyCadastros(),...imp.cadastros});setShowImport(false);showToast("Importado!");}else showToast("Formato inválido","error");}catch{showToast("JSON inválido","error");}}}>✓ Importar</button>
               <button style={btnG} onClick={()=>setShowImport(false)}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT USO MODAL */}
+      {editUso&&(
+        <div style={{position:"fixed",inset:0,zIndex:500,background:"rgba(0,0,0,0.4)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}} onClick={()=>setEditUso(null)}>
+          <div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:"16px",padding:"24px",width:"480px",maxWidth:"96vw",boxShadow:shadowMd}} onClick={e=>e.stopPropagation()}>
+            <h3 style={{color:T.text,margin:"0 0 16px",fontSize:"16px"}}>✏️ Editar compra no cartão</h3>
+            <div style={{display:"flex",flexDirection:"column",gap:"10px"}}>
+              <div><label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Cartão</label>
+                <select style={selS} value={editUso.cartaoId} onChange={e=>setEditUso(u=>({...u,cartaoId:e.target.value}))}>
+                  {cartoes.map(c=><option key={c.id} value={c.id}>{c.nome}</option>)}
+                </select>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px"}}>
+                <div><label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Data da compra</label><input type="date" style={inpDate} value={editUso.data} onChange={e=>setEditUso(u=>({...u,data:e.target.value}))}/></div>
+                <div><label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Parcelas</label><input type="number" style={inpS} value={editUso.parcelas} onChange={e=>{const p=parseInt(e.target.value)||1;setEditUso(u=>({...u,parcelas:p,valorParcela:parseFloat((u.valor/p).toFixed(2))}));}} /></div>
+              </div>
+              <div><label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Descrição</label><input style={inpS} value={editUso.descricao} onChange={e=>setEditUso(u=>({...u,descricao:e.target.value}))}/></div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px"}}>
+                <div><label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Valor total (R$)</label><input type="number" step="0.01" style={inpS} value={editUso.valor} onChange={e=>{const v=parseFloat(e.target.value)||0;setEditUso(u=>({...u,valor:v,valorParcela:parseFloat((v/u.parcelas).toFixed(2))}));}} /></div>
+                <div><label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Valor/parcela</label><input style={{...inpS,background:T.surfaceAlt,color:T.textSub}} readOnly value={fmt(editUso.valorParcela)}/></div>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:"8px",marginTop:"16px",justifyContent:"flex-end",borderTop:`1px solid ${T.border}`,paddingTop:"14px"}}>
+              <button style={btnP(T.green)} onClick={()=>{setUsoCartoes(u=>u.map(x=>x.id===editUso.id?editUso:x));setEditUso(null);showToast("Compra atualizada!");}}>✅ Salvar</button>
+              <button style={btnG} onClick={()=>setEditUso(null)}>Cancelar</button>
             </div>
           </div>
         </div>
