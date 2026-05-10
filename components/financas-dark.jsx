@@ -129,6 +129,7 @@ export default function App() {
   const [syncMonth, setSyncMonth] = useState(new Date().getMonth());
   const [syncing, setSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState(null);
+  const [syncPreview, setSyncPreview] = useState(null); // { receitas, despesas, month }
 
   // storage load
   useEffect(() => {
@@ -284,27 +285,23 @@ export default function App() {
     setSyncing(false);
   };
 
+  const toItem = (x) => ({
+    id: uid(),
+    desc: x.description || x.descricao || x.desc || "",
+    valor: parseFloat(x.amount || x.valor) || 0,
+    date: x.date || x.data || today,
+  });
+
   const lerDaPlanilha = async () => {
     if (!syncUrl) { setSyncStatus({ ok:false, msg:"Cole a URL do Apps Script primeiro" }); return; }
-    setSyncing(true); setSyncStatus(null);
+    setSyncing(true); setSyncStatus(null); setSyncPreview(null);
     try {
       const r = await fetch(`${syncUrl}?action=read&month=${syncMonth + 1}&year=${CY}`);
       const j = await r.json();
-      if (j.error) { setSyncStatus({ ok:false, msg: j.error }); setSyncing(false); return; }
-
-      // Apps Script retorna: { income: [...], expenses: [...] }
-      // income items:   { date, description, amount }
-      // expense items:  { date, description, amount, status }
-      const toItem = (x) => ({
-        id: uid(),
-        desc: x.description || x.descricao || x.desc || "",
-        valor: parseFloat(x.amount || x.valor) || 0,
-        date: x.date || x.data || today,
-      });
+      if (j.error) { setSyncStatus({ ok:false, msg:`❌ ${j.error}` }); setSyncing(false); return; }
 
       const novasReceitas = (j.income || j.receitas || []).map(toItem);
       const todasDespesas = (j.expenses || j.despesas || []);
-      // Separa investimentos das despesas pelo status ou descrição
       const novasDespesas = todasDespesas
         .filter(x => !String(x.description||x.descricao||"").toLowerCase().includes("invest") &&
                      !String(x.description||x.descricao||"").toLowerCase().includes("aplicaç"))
@@ -314,23 +311,40 @@ export default function App() {
                      String(x.description||x.descricao||"").toLowerCase().includes("aplicaç"))
         .map(toItem);
 
-      const totalRec = novasReceitas.reduce((s,x)=>s+x.valor,0);
-      const totalDesp = novasDespesas.reduce((s,x)=>s+x.valor,0);
-      const totalInv = novosInvest.reduce((s,x)=>s+x.valor,0);
+      if (novasReceitas.length === 0 && novasDespesas.length === 0 && novosInvest.length === 0) {
+        setSyncStatus({ ok:false, msg:`⚠️ Nenhum dado encontrado na aba "${j.sheet || (String(syncMonth+1).padStart(2,"0")+"."+String(CY).slice(-2))}". Verifique o nome da aba na planilha.` });
+        setSyncing(false); return;
+      }
 
-      setData(d => d.map((m, i) => {
-        if (i !== syncMonth) return m;
-        return {
-          ...m,
-          receitas: [...m.receitas, ...novasReceitas],
-          despesas: [...m.despesas, ...novasDespesas],
-          investimentos: [...m.investimentos, ...novosInvest],
-        };
-      }));
-      setSyncStatus({ ok:true, msg:`✅ ${MONTHS[syncMonth]} importado! ${novasReceitas.length} receitas (${new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(totalRec)}) • ${novasDespesas.length} despesas (${new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(totalDesp)})` });
-      showToast(`✅ Planilha de ${MONTHS[syncMonth]} importada!`);
-    } catch (e) { setSyncStatus({ ok:false, msg:"Erro ao ler planilha. Verifique a URL e o script." }); }
+      // Mostra prévia para o usuário confirmar
+      setSyncPreview({ receitas: novasReceitas, despesas: novasDespesas, investimentos: novosInvest, month: syncMonth, sheet: j.sheet });
+      setSyncStatus(null);
+    } catch (e) {
+      setSyncStatus({ ok:false, msg:"❌ Erro ao conectar. Verifique a URL e tente novamente." });
+    }
     setSyncing(false);
+  };
+
+  const confirmarImport = async () => {
+    if (!syncPreview) return;
+    const { receitas, despesas, investimentos, month } = syncPreview;
+    const novoData = data.map((m, i) => {
+      if (i !== month) return m;
+      return {
+        ...m,
+        receitas: [...m.receitas, ...receitas],
+        despesas: [...m.despesas, ...despesas],
+        investimentos: [...m.investimentos, ...investimentos],
+      };
+    });
+    setData(novoData);
+    // Salva automaticamente após importar
+    try {
+      await window.storage.set("pfin_light_v1", JSON.stringify({ data: novoData, cartoes, usoCartoes, pagamentos, syncUrl }));
+    } catch (_) {}
+    setSyncPreview(null);
+    setSyncStatus({ ok:true, msg:`✅ ${MONTHS[month]} importado e salvo! ${receitas.length} receitas • ${despesas.length} despesas • ${investimentos.length} investimentos` });
+    showToast(`✅ Dados de ${MONTHS[month]} salvos com sucesso!`);
   };
 
   // EntryForm
@@ -953,6 +967,69 @@ export default function App() {
               <p style={{ color:T.textSub, fontSize:"12px", marginTop:"10px" }}>
                 ⚡ Os dados importados são adicionados ao mês selecionado. Não substitui lançamentos existentes.
               </p>
+
+              {/* PRÉVIA dos dados encontrados */}
+              {syncPreview && (
+                <div style={{ marginTop:"16px", background:T.surfaceAlt, border:`1.5px solid ${T.purple}`, borderRadius:"12px", padding:"16px" }}>
+                  <p style={{ fontSize:"14px", fontWeight:700, color:T.purple, marginBottom:"12px" }}>
+                    🔍 Prévia — {MONTHS[syncPreview.month]} {CY} <span style={{ color:T.textSub, fontWeight:400, fontSize:"12px" }}>({syncPreview.sheet})</span>
+                  </p>
+
+                  {/* Receitas */}
+                  {syncPreview.receitas.length > 0 && (
+                    <div style={{ marginBottom:"12px" }}>
+                      <p style={{ fontSize:"12px", fontWeight:700, color:T.green, marginBottom:"6px" }}>
+                        📥 Receitas ({syncPreview.receitas.length}) — Total: {fmt(syncPreview.receitas.reduce((s,x)=>s+x.valor,0))}
+                      </p>
+                      {syncPreview.receitas.map((x,i) => (
+                        <div key={i} style={{ display:"flex", justifyContent:"space-between", fontSize:"12px", padding:"4px 8px", background:T.greenLight, borderRadius:"6px", marginBottom:"3px" }}>
+                          <span style={{ color:T.text }}>{x.desc}</span>
+                          <span style={{ color:T.green, fontWeight:600 }}>{fmt(x.valor)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Despesas */}
+                  {syncPreview.despesas.length > 0 && (
+                    <div style={{ marginBottom:"12px" }}>
+                      <p style={{ fontSize:"12px", fontWeight:700, color:T.red, marginBottom:"6px" }}>
+                        📤 Despesas ({syncPreview.despesas.length}) — Total: {fmt(syncPreview.despesas.reduce((s,x)=>s+x.valor,0))}
+                      </p>
+                      {syncPreview.despesas.map((x,i) => (
+                        <div key={i} style={{ display:"flex", justifyContent:"space-between", fontSize:"12px", padding:"4px 8px", background:T.redLight, borderRadius:"6px", marginBottom:"3px" }}>
+                          <span style={{ color:T.text }}>{x.desc}</span>
+                          <span style={{ color:T.red, fontWeight:600 }}>{fmt(x.valor)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Investimentos */}
+                  {syncPreview.investimentos.length > 0 && (
+                    <div style={{ marginBottom:"12px" }}>
+                      <p style={{ fontSize:"12px", fontWeight:700, color:T.blue, marginBottom:"6px" }}>
+                        💎 Investimentos ({syncPreview.investimentos.length}) — Total: {fmt(syncPreview.investimentos.reduce((s,x)=>s+x.valor,0))}
+                      </p>
+                      {syncPreview.investimentos.map((x,i) => (
+                        <div key={i} style={{ display:"flex", justifyContent:"space-between", fontSize:"12px", padding:"4px 8px", background:T.blueLight, borderRadius:"6px", marginBottom:"3px" }}>
+                          <span style={{ color:T.text }}>{x.desc}</span>
+                          <span style={{ color:T.blue, fontWeight:600 }}>{fmt(x.valor)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div style={{ display:"flex", gap:"8px", marginTop:"14px" }}>
+                    <button style={btnPrimary(T.green)} onClick={confirmarImport}>
+                      ✅ Confirmar e Salvar
+                    </button>
+                    <button style={btnOutline(T.red)} onClick={() => setSyncPreview(null)}>
+                      ✕ Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Instruções */}
