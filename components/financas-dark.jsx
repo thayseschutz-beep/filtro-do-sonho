@@ -4,13 +4,9 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine
 } from "recharts";
 
-// ── Polyfill para localStorage (Next.js / fora do Claude) ─────────────────
-if (typeof window !== "undefined" && !window.storage) {
-  window.storage = {
-    get: async (k) => { const v = localStorage.getItem(k); return v ? { value: v } : null; },
-    set: async (k, v) => { localStorage.setItem(k, v); return true; },
-  };
-}
+// ── Supabase ───────────────────────────────────────────────────────────────
+import { createClient } from "@/lib/supabase/client";
+const CASAL_ID = "casal"; // linha única compartilhada pelo casal
 
 // ── Mobile hook ───────────────────────────────────────────────────────────────
 function useIsMobile() {
@@ -133,33 +129,68 @@ export default function App() {
 
   // storage load
   useEffect(() => {
-    (async () => {
+    const supabase = createClient();
+    // Carrega dados do Supabase
+    const loadData = async () => {
       try {
-        const r = await window.storage.get("pfin_light_v1");
-        if (r?.value) {
-          const p = JSON.parse(r.value);
-          if (p.data) setData(p.data);
-          if (p.cartoes) setCartoes(p.cartoes);
-          if (p.usoCartoes) setUsoCartoes(p.usoCartoes);
-          if (p.pagamentos) setPagamentos(p.pagamentos);
-          if (p.syncUrl) setSyncUrl(p.syncUrl);
+        const { data: row } = await supabase
+          .from("financas_compartilhadas")
+          .select("*")
+          .eq("id", CASAL_ID)
+          .single();
+        if (row) {
+          if (row.data) setData(row.data);
+          if (row.cartoes) setCartoes(row.cartoes);
+          if (row.uso_cartoes) setUsoCartoes(row.uso_cartoes);
+          if (row.pagamentos) setPagamentos(row.pagamentos);
+          if (row.sync_url) setSyncUrl(row.sync_url);
         }
       } catch (_) {}
-    })();
+    };
+    loadData();
+
+    // Escuta mudanças em tempo real
+    const channel = supabase
+      .channel("financas_realtime")
+      .on("postgres_changes", {
+        event: "UPDATE",
+        schema: "public",
+        table: "financas_compartilhadas",
+        filter: `id=eq.${CASAL_ID}`,
+      }, (payload) => {
+        const row = payload.new;
+        if (row.data) setData(row.data);
+        if (row.cartoes) setCartoes(row.cartoes);
+        if (row.uso_cartoes) setUsoCartoes(row.uso_cartoes);
+        if (row.pagamentos) setPagamentos(row.pagamentos);
+        if (row.sync_url) setSyncUrl(row.sync_url);
+        showToast("🔄 Dados atualizados!");
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const showToast = (msg, type="success") => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
 
+  const saveToSupabase = async (payload) => {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("financas_compartilhadas")
+      .upsert({ id: CASAL_ID, updated_at: new Date().toISOString(), ...payload });
+    if (error) throw error;
+  };
+
   const handleSave = async () => {
     try {
-      await window.storage.set("pfin_light_v1", JSON.stringify({ data, cartoes, usoCartoes, pagamentos, syncUrl }));
-      showToast("✅ Dados salvos com sucesso!");
+      await saveToSupabase({ data, cartoes, uso_cartoes: usoCartoes, pagamentos, sync_url: syncUrl });
+      showToast("✅ Salvo! Lucas verá em instantes.");
     } catch (_) { showToast("Erro ao salvar", "error"); }
   };
 
   const saveSyncUrl = async () => {
     try {
-      await window.storage.set("pfin_light_v1", JSON.stringify({ data, cartoes, usoCartoes, pagamentos, syncUrl }));
+      await saveToSupabase({ data, cartoes, uso_cartoes: usoCartoes, pagamentos, sync_url: syncUrl });
       showToast("✅ URL salva!");
     } catch (_) { showToast("Erro ao salvar URL", "error"); }
   };
@@ -338,9 +369,9 @@ export default function App() {
       };
     });
     setData(novoData);
-    // Salva automaticamente após importar
+    // Salva automaticamente no Supabase após importar
     try {
-      await window.storage.set("pfin_light_v1", JSON.stringify({ data: novoData, cartoes, usoCartoes, pagamentos, syncUrl }));
+      await saveToSupabase({ data: novoData, cartoes, uso_cartoes: usoCartoes, pagamentos, sync_url: syncUrl });
     } catch (_) {}
     setSyncPreview(null);
     setSyncStatus({ ok:true, msg:`✅ ${MONTHS[month]} importado e salvo! ${receitas.length} receitas • ${despesas.length} despesas • ${investimentos.length} investimentos` });
