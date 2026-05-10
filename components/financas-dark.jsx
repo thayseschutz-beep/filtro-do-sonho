@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect, useMemo } from "react";
 import {
   AreaChart, Area, BarChart, Bar, LineChart, Line,
@@ -139,10 +141,22 @@ export default function App() {
           .eq("id", CASAL_ID)
           .single();
         if (row) {
-          if (row.data) setData(row.data);
-          if (row.cartoes) setCartoes(row.cartoes);
-          if (row.uso_cartoes) setUsoCartoes(row.uso_cartoes);
-          if (row.pagamentos) setPagamentos(row.pagamentos);
+          // Garante estrutura correta de 12 meses
+          if (row.data && Array.isArray(row.data) && row.data.length > 0) {
+            const base = emptyYear();
+            row.data.forEach((m, i) => {
+              if (i < 12 && m) base[i] = {
+                ...base[i],
+                receitas: Array.isArray(m.receitas) ? m.receitas : [],
+                despesas: Array.isArray(m.despesas) ? m.despesas : [],
+                investimentos: Array.isArray(m.investimentos) ? m.investimentos : [],
+              };
+            });
+            setData(base);
+          }
+          if (row.cartoes && Array.isArray(row.cartoes)) setCartoes(row.cartoes);
+          if (row.uso_cartoes && Array.isArray(row.uso_cartoes)) setUsoCartoes(row.uso_cartoes);
+          if (row.pagamentos && typeof row.pagamentos === 'object') setPagamentos(row.pagamentos);
           if (row.sync_url) setSyncUrl(row.sync_url);
         }
       } catch (_) {}
@@ -159,10 +173,21 @@ export default function App() {
         filter: `id=eq.${CASAL_ID}`,
       }, (payload) => {
         const row = payload.new;
-        if (row.data) setData(row.data);
-        if (row.cartoes) setCartoes(row.cartoes);
-        if (row.uso_cartoes) setUsoCartoes(row.uso_cartoes);
-        if (row.pagamentos) setPagamentos(row.pagamentos);
+        if (row.data && Array.isArray(row.data) && row.data.length > 0) {
+          const base = emptyYear();
+          row.data.forEach((m, i) => {
+            if (i < 12 && m) base[i] = {
+              ...base[i],
+              receitas: Array.isArray(m.receitas) ? m.receitas : [],
+              despesas: Array.isArray(m.despesas) ? m.despesas : [],
+              investimentos: Array.isArray(m.investimentos) ? m.investimentos : [],
+            };
+          });
+          setData(base);
+        }
+        if (row.cartoes && Array.isArray(row.cartoes)) setCartoes(row.cartoes);
+        if (row.uso_cartoes && Array.isArray(row.uso_cartoes)) setUsoCartoes(row.uso_cartoes);
+        if (row.pagamentos && typeof row.pagamentos === 'object') setPagamentos(row.pagamentos);
         if (row.sync_url) setSyncUrl(row.sync_url);
         showToast("🔄 Dados atualizados!");
       })
@@ -242,10 +267,10 @@ export default function App() {
 
   const chartData = MS.map((m, i) => ({
     name: m,
-    Receitas: sumArr(data[i].receitas),
-    Despesas: sumArr(data[i].despesas),
+    Receitas: sumArr(data[i]?.receitas),
+    Despesas: sumArr(data[i]?.despesas),
     Cartões: cartoes.reduce((s, c) => s + getFat(c.id, CY, i), 0),
-    Saldo: sumArr(data[i].receitas) - sumArr(data[i].despesas) - sumArr(data[i].investimentos)
+    Saldo: sumArr(data[i]?.receitas) - sumArr(data[i]?.despesas) - sumArr(data[i]?.investimentos)
       - cartoes.reduce((s, c) => s + (!isPago(c.id, CY, i) ? getFat(c.id, CY, i) : 0), 0),
   }));
 
@@ -645,7 +670,7 @@ export default function App() {
               <p style={{ fontSize:"13px", fontWeight:600, color:T.text, marginBottom:"14px" }}>📅 Resumo {CY}</p>
               <div style={{ display:"grid", gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)", gap:"8px" }}>
                 {MONTHS.map((m, i) => {
-                  const r = sumArr(data[i].receitas), d = sumArr(data[i].despesas), inv = sumArr(data[i].investimentos);
+                  const r = sumArr(data[i]?.receitas), d = sumArr(data[i]?.despesas), inv = sumArr(data[i]?.investimentos);
                   const cart = cartoes.reduce((s, c) => s + getFat(c.id, CY, i), 0);
                   const s = r - d - inv - cartoes.reduce((s2, c) => s2 + (!isPago(c.id, CY, i) ? getFat(c.id, CY, i) : 0), 0);
                   const active = i === currentMonth;
@@ -710,7 +735,7 @@ export default function App() {
                   </thead>
                   <tbody>
                     {MONTHS.map((m, i) => {
-                      const r = sumArr(data[i].receitas), d = sumArr(data[i].despesas), inv = sumArr(data[i].investimentos);
+                      const r = sumArr(data[i]?.receitas), d = sumArr(data[i]?.despesas), inv = sumArr(data[i]?.investimentos);
                       const cart = cartoes.reduce((s, c) => s + getFat(c.id, CY, i), 0);
                       const s = r - d - inv - cartoes.reduce((s2, c) => s2 + (!isPago(c.id, CY, i) ? getFat(c.id, CY, i) : 0), 0);
                       return (
