@@ -211,36 +211,51 @@ function LancModal({tipo,form,setForm,onSave,onClose,cadastros,today}){
 }
 
 // ── ItemList (fora do App) ─────────────────────────────────────────────────
-function ItemList({items,col,emptyMsg,onEdit,onRemove,tipo}){
-  const meioPagLabel = {pix:"PIX",dinheiro:"Dinheiro",cheque:"Cheque",boleto:"Boleto",ted:"TED",cartao:"Cartão"};
+function ItemList({items,col,emptyMsg,onEdit,onRemove,onBaixa,tipo}){
+  const meioPagLabel={pix:"PIX",dinheiro:"Dinheiro",cheque:"Cheque",boleto:"Boleto",ted:"TED",cartao:"Cartão"};
+  const getBaixaLabel=(item)=>{
+    if(tipo==="receita") return item.recebido?"✓ Recebido":"Receber";
+    if(tipo==="investimento") return item.investido?"✓ Aplicado":"Aplicar";
+    return item.pago?"✓ Pago":"Dar Baixa";
+  };
+  const isConfirmado=(item)=>item.recebido||item.investido||item.pago;
   if(!items||items.length===0) return <p style={{color:T.textMuted,fontSize:"13px",textAlign:"center",padding:"20px 0"}}>{emptyMsg}</p>;
   return <div>
-    {items.map(item=>(
-      <div key={item.id} style={{...itemRow,flexWrap:"wrap",gap:"8px"}}>
-        <div style={{flex:1,minWidth:"180px"}}>
+    {items.map(item=>{
+      const confirmado=isConfirmado(item);
+      return(
+        <div key={item.id} style={{...itemRow,flexWrap:"wrap",gap:"8px",background:confirmado?"#F0FDF4":T.surfaceAlt,border:`1px solid ${confirmado?"#BBF7D0":T.border}`}}>
+          <div style={{flex:1,minWidth:"180px"}}>
+            <div style={{display:"flex",alignItems:"center",gap:"6px",flexWrap:"wrap"}}>
+              <p style={{color:confirmado?T.green:T.text,fontSize:"13px",fontWeight:600,margin:0,textDecoration:confirmado?"none":"none"}}>{item.desc}</p>
+              {item.ref&&<span style={{...chip(T.purple),fontSize:"10px"}}>{item.ref}</span>}
+              {confirmado&&<span style={{...chip(T.green),fontSize:"10px"}}>✓ {tipo==="receita"?"Recebido":tipo==="investimento"?"Aplicado":"Pago"}</span>}
+              {item.recorrente&&<span style={{...chip(T.amber),fontSize:"10px"}}>🔁</span>}
+              {item.dataBaixa&&<span style={{fontSize:"10px",color:T.green}}>em {item.dataBaixa}</span>}
+            </div>
+            <div style={{display:"flex",gap:"8px",marginTop:"3px",flexWrap:"wrap"}}>
+              <span style={{color:T.textMuted,fontSize:"11px"}}>{item.date||item.data}</span>
+              {item.cliente&&<span style={{color:T.textSub,fontSize:"11px"}}>👤 {item.cliente}</span>}
+              {item.fornecedor&&<span style={{color:T.textSub,fontSize:"11px"}}>🏢 {item.fornecedor}</span>}
+              {item.parafem&&<span style={{color:T.textSub,fontSize:"11px"}}>↔ {item.parafem}</span>}
+              {item.banco&&<span style={{color:T.textSub,fontSize:"11px"}}>🏦 {item.banco}</span>}
+              {item.meioPag&&<span style={{color:T.blue,fontSize:"11px"}}>{meioPagLabel[item.meioPag]||item.meioPag}</span>}
+              {item.parcelas>1&&<span style={{color:T.amber,fontSize:"11px"}}>{item.parcelas}x</span>}
+            </div>
+          </div>
           <div style={{display:"flex",alignItems:"center",gap:"6px",flexWrap:"wrap"}}>
-            <p style={{color:T.text,fontSize:"13px",fontWeight:600,margin:0}}>{item.desc}</p>
-            {item.ref&&<span style={{...chip(T.purple),fontSize:"10px"}}>{item.ref}</span>}
-            {(item.pago||item.investido)&&<span style={{...chip(T.green),fontSize:"10px"}}>✓ {tipo==="investimento"?"Investido":"Pago"}</span>}
-            {item.recorrente&&<span style={{...chip(T.amber),fontSize:"10px"}}>🔁 Recorrente</span>}
-          </div>
-          <div style={{display:"flex",gap:"8px",marginTop:"3px",flexWrap:"wrap"}}>
-            <span style={{color:T.textMuted,fontSize:"11px"}}>{item.date||item.data}</span>
-            {item.cliente&&<span style={{color:T.textSub,fontSize:"11px"}}>👤 {item.cliente}</span>}
-            {item.fornecedor&&<span style={{color:T.textSub,fontSize:"11px"}}>🏢 {item.fornecedor}</span>}
-            {item.parafem&&<span style={{color:T.textSub,fontSize:"11px"}}>↔ {item.parafem}</span>}
-            {item.banco&&<span style={{color:T.textSub,fontSize:"11px"}}>🏦 {item.banco}</span>}
-            {item.meioPag&&<span style={{color:T.blue,fontSize:"11px"}}>{meioPagLabel[item.meioPag]||item.meioPag}</span>}
-            {item.parcelas>1&&<span style={{color:T.amber,fontSize:"11px"}}>{item.parcelas}x</span>}
+            <span style={{color:confirmado?T.green:col,fontWeight:700,fontSize:"14px"}}>{fmt(item.valor)}</span>
+            <button
+              style={{background:confirmado?"#DCFCE7":"#EFF6FF",border:`1px solid ${confirmado?"#BBF7D0":"#BFDBFE"}`,color:confirmado?T.green:T.blue,borderRadius:"6px",cursor:"pointer",padding:"4px 9px",fontSize:"11px",fontWeight:700,whiteSpace:"nowrap"}}
+              onClick={()=>onBaixa(item.id)}>
+              {getBaixaLabel(item)}
+            </button>
+            <button style={editB} onClick={()=>onEdit(item)}>✏️</button>
+            <button style={remB} onClick={()=>onRemove(item.id)}>✕</button>
           </div>
         </div>
-        <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
-          <span style={{color:col,fontWeight:700,fontSize:"14px"}}>{fmt(item.valor)}</span>
-          <button style={editB} onClick={()=>onEdit(item)}>✏️</button>
-          <button style={remB} onClick={()=>onRemove(item.id)}>✕</button>
-        </div>
-      </div>
-    ))}
+      );
+    })}
   </div>;
 }
 
@@ -274,6 +289,7 @@ export default function App(){
   const [novoCartao, setNovoCartao] = useState({nome:"",diaFechamento:"",diaPagamento:"",limite:""});
   const [novoUso, setNovoUso] = useState({cartaoId:"",data:today,descricao:"",valor:"",parcelas:"1"});
   const [novoCad, setNovoCad] = useState({nome:"",obs:"",agencia:"",conta:"",limite:""});
+  const [editCad, setEditCad] = useState(null); // {tipo, item}
   const [syncMonth, setSyncMonth] = useState(nowM);
   const [syncStatus, setSyncStatus] = useState(null);
   const [syncPreview, setSyncPreview] = useState(null);
@@ -380,6 +396,10 @@ export default function App(){
   const faturasMes=cartoes.reduce((s,c)=>s+getFat(c.id,CY,currentMonth),0);
   const faturasAbertas=faturasMes-cartoes.reduce((s,c)=>s+(isPago(c.id,CY,currentMonth)?getFat(c.id,CY,currentMonth):0),0);
   const saldoReal=saldo-faturasAbertas;
+  const recConfirmado=sumArr(monthData.receitas.filter(x=>x.recebido));
+  const despConfirmada=sumArr(monthData.despesas.filter(x=>x.pago));
+  const invConfirmado=sumArr(monthData.investimentos.filter(x=>x.investido));
+  const empConfirmado=sumArr(monthData.emprestimos.filter(x=>x.pago));
   const totalAtrasado=yrMs.slice(0,nowM).reduce((s,m)=>s+cartoes.reduce((ss,c)=>ss+(!isPago(c.id,CY,m)?getFat(c.id,CY,m):0),0),0);
   const totalAnualCartoes=yrMs.reduce((s,m)=>s+cartoes.reduce((ss,c)=>ss+getFat(c.id,CY,m),0),0);
   const totalAbertoPendente=yrMs.reduce((s,m)=>s+cartoes.reduce((ss,c)=>ss+(!isPago(c.id,CY,m)?getFat(c.id,CY,m):0),0),0);
@@ -426,6 +446,14 @@ export default function App(){
     setData(d=>d.map((m,i)=>i===currentMonth?{...m,[key]:m[key].filter(x=>x.id!==id)}:m));
   };
 
+  const toggleBaixa=(tipo,id)=>{
+    const key=tipo==="receita"?"receitas":tipo==="despesa"?"despesas":tipo==="investimento"?"investimentos":"emprestimos";
+    const statusField=tipo==="receita"?"recebido":tipo==="investimento"?"investido":"pago";
+    const dataBaixa=new Date().toISOString().split("T")[0];
+    setData(d=>d.map((m,i)=>i===currentMonth?{...m,[key]:m[key].map(x=>x.id===id?{...x,[statusField]:!x[statusField],dataBaixa:!x[statusField]?dataBaixa:null}:x)}:m));
+    showToast("Status atualizado!");
+  };
+
   const startEdit=(item,tipo)=>setEditingItem({...item,tipo,editDesc:item.desc,editValor:String(item.valor),editDate:item.date||item.data,editRef:item.ref||"",editCliente:item.cliente||"",editFornecedor:item.fornecedor||"",editBanco:item.banco||""});
 
   const saveEdit=()=>{
@@ -465,6 +493,13 @@ export default function App(){
   };
 
   const removeCad=(tipo,id)=>setCadastros(c=>({...c,[tipo]:c[tipo].filter(x=>x.id!==id)}));
+  const saveEditCad=()=>{
+    if(!editCad)return;
+    const{tipo,item}=editCad;
+    setCadastros(c=>({...c,[tipo]:c[tipo].map(x=>x.id===item.id?item:x)}));
+    setEditCad(null);
+    showToast("Cadastro atualizado!");
+  };
 
   const handleSave=async()=>{
     try{await saveToSupa({data:safeData,cartoes,uso_cartoes:usoCartoes,pagamentos,sync_url:syncUrl,cadastros});showToast("✅ Salvo! Lucas verá em instantes.");}
@@ -581,15 +616,25 @@ export default function App(){
             </div>}
 
             <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(2,1fr)":"repeat(4,1fr)",gap:"12px",marginBottom:"12px"}}>
-              {[{l:"RECEITAS",v:recTotal,c:T.green,bg:T.greenLight,i:"↑"},{l:"DESPESAS",v:despTotal,c:T.red,bg:T.redLight,i:"↓"},{l:"INVESTIMENTOS",v:invTotal,c:T.blue,bg:T.blueLight,i:"◆"},{l:"FATURAS CARTÕES",v:faturasMes,c:T.amber,bg:T.amberLight,i:"💳",sub:faturasAbertas>0?`${fmt(faturasAbertas)} em aberto`:"✓ Em dia"}].map(m=>(
+              {[
+                {l:"RECEITAS",v:recTotal,c:T.green,bg:T.greenLight,i:"↑",conf:recConfirmado,confLabel:"recebido"},
+                {l:"DESPESAS",v:despTotal,c:T.red,bg:T.redLight,i:"↓",conf:despConfirmada,confLabel:"pago"},
+                {l:"INVESTIMENTOS",v:invTotal,c:T.blue,bg:T.blueLight,i:"◆",conf:invConfirmado,confLabel:"aplicado"},
+                {l:"FATURAS CARTÕES",v:faturasMes,c:T.amber,bg:T.amberLight,i:"💳",sub:faturasAbertas>0?`${fmt(faturasAbertas)} em aberto`:"✓ Em dia"},
+              ].map(m=>(
                 <div key={m.l} style={{...card({marginBottom:0}),border:`1px solid ${m.c}30`}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"8px"}}>
                     <p style={{fontSize:"10px",fontWeight:700,color:T.textSub,textTransform:"uppercase",letterSpacing:"0.06em",margin:0}}>{m.l}</p>
                     <span style={{background:m.bg,color:m.c,borderRadius:"8px",padding:"4px 8px",fontSize:"14px"}}>{m.i}</span>
                   </div>
                   <p style={{fontSize:"22px",fontWeight:700,color:m.c,margin:"0 0 4px"}}>{fmt(m.v)}</p>
-                  {m.sub&&<span style={{fontSize:"10px",fontWeight:600,color:m.c,background:m.bg,padding:"2px 8px",borderRadius:"20px"}}>{m.sub}</span>}
-                  {!m.sub&&<span style={{fontSize:"10px",fontWeight:600,color:m.c,background:m.bg,padding:"2px 8px",borderRadius:"20px"}}>{MONTHS[currentMonth]}</span>}
+                  {m.conf!==undefined&&<div style={{marginTop:"4px"}}>
+                    <div style={{height:4,background:T.surfaceAlt,borderRadius:4,border:`1px solid ${T.border}`,marginBottom:"3px"}}>
+                      <div style={{height:4,width:m.v>0?`${Math.min(100,(m.conf/m.v)*100)}%`:"0%",background:m.c,borderRadius:4,transition:"width 0.4s"}}/>
+                    </div>
+                    <span style={{fontSize:"10px",color:m.v>0&&m.conf===m.v?T.green:T.textSub}}>{m.v>0&&m.conf===m.v?"✓ 100% "+m.confLabel:`${fmt(m.conf)} ${m.confLabel} de ${fmt(m.v)}`}</span>
+                  </div>}
+                  {m.sub&&<span style={{fontSize:"10px",fontWeight:600,color:m.c,background:m.bg,padding:"2px 8px",borderRadius:"20px",display:"inline-block",marginTop:"4px"}}>{m.sub}</span>}
                 </div>
               ))}
             </div>
@@ -726,6 +771,7 @@ export default function App(){
                     emptyMsg={`Nenhum lançamento em ${MONTHS[currentMonth]}`}
                     onEdit={(item)=>startEdit(item,t.key)}
                     onRemove={(id)=>removeItem(t.key,id)}
+                    onBaixa={(id)=>toggleBaixa(t.key,id)}
                   />
                   <div style={{textAlign:"right",borderTop:`1px solid ${T.border}`,paddingTop:"8px",marginTop:"8px"}}>
                     <span style={{color:T.textSub,fontSize:"12px"}}>Total: </span>
@@ -1053,13 +1099,32 @@ export default function App(){
                   <div style={card()}>
                     <p style={{fontSize:"13px",fontWeight:600,color:T.text,marginBottom:"12px"}}>📋 {cadSub==="bancos"?"Bancos":cadSub==="fornecedores"?"Fornecedores":"Pessoas"} Cadastrados ({(cadastros[cadSub]||[]).length})</p>
                     {(cadastros[cadSub]||[]).map((item,i)=>(
-                      <div key={item.id} style={itemRow}>
-                        <div>
-                          <p style={{color:T.text,fontSize:"13px",fontWeight:500,margin:0}}>{item.nome}</p>
-                          {item.obs&&<p style={{color:T.textSub,fontSize:"11px",margin:"2px 0 0"}}>{item.obs}</p>}
-                          {item.agencia&&<p style={{color:T.textSub,fontSize:"11px",margin:"2px 0 0"}}>Ag: {item.agencia} | Conta: {item.conta}</p>}
-                        </div>
-                        <button style={remB} onClick={()=>removeCad(cadSub,item.id)}>✕</button>
+                      <div key={item.id} style={{...itemRow,flexDirection:"column",alignItems:"stretch",gap:"0"}}>
+                        {editCad?.item?.id===item.id&&editCad?.tipo===cadSub?(
+                          <div style={{display:"flex",flexDirection:"column",gap:"8px",padding:"8px 0"}}>
+                            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px"}}>
+                              <div><label style={{fontSize:"11px",color:T.textSub,display:"block",marginBottom:"3px"}}>Nome</label><input style={inpS} value={editCad.item.nome} onChange={e=>setEditCad(ec=>({...ec,item:{...ec.item,nome:e.target.value}}))}/></div>
+                              <div><label style={{fontSize:"11px",color:T.textSub,display:"block",marginBottom:"3px"}}>Observação</label><input style={inpS} value={editCad.item.obs||""} onChange={e=>setEditCad(ec=>({...ec,item:{...ec.item,obs:e.target.value}}))}/></div>
+                              {cadSub==="bancos"&&<><div><label style={{fontSize:"11px",color:T.textSub,display:"block",marginBottom:"3px"}}>Agência</label><input style={inpS} value={editCad.item.agencia||""} onChange={e=>setEditCad(ec=>({...ec,item:{...ec.item,agencia:e.target.value}}))}/></div><div><label style={{fontSize:"11px",color:T.textSub,display:"block",marginBottom:"3px"}}>Conta</label><input style={inpS} value={editCad.item.conta||""} onChange={e=>setEditCad(ec=>({...ec,item:{...ec.item,conta:e.target.value}}))}/></div></>}
+                            </div>
+                            <div style={{display:"flex",gap:"6px"}}>
+                              <button style={btnP(T.green)} onClick={saveEditCad}>✅ Salvar</button>
+                              <button style={btnG} onClick={()=>setEditCad(null)}>Cancelar</button>
+                            </div>
+                          </div>
+                        ):(
+                          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                            <div>
+                              <p style={{color:T.text,fontSize:"13px",fontWeight:500,margin:0}}>{item.nome}</p>
+                              {item.obs&&<p style={{color:T.textSub,fontSize:"11px",margin:"2px 0 0"}}>{item.obs}</p>}
+                              {item.agencia&&<p style={{color:T.textSub,fontSize:"11px",margin:"2px 0 0"}}>Ag: {item.agencia} | Conta: {item.conta}</p>}
+                            </div>
+                            <div style={{display:"flex",gap:"5px"}}>
+                              <button style={editB} onClick={()=>setEditCad({tipo:cadSub,item:{...item}})}>✏️ Editar</button>
+                              <button style={remB} onClick={()=>{if(confirm(`Remover "${item.nome}"?`))removeCad(cadSub,item.id);}}>✕</button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
