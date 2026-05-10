@@ -291,15 +291,44 @@ export default function App() {
       const r = await fetch(`${syncUrl}?action=read&month=${syncMonth + 1}&year=${CY}`);
       const j = await r.json();
       if (j.error) { setSyncStatus({ ok:false, msg: j.error }); setSyncing(false); return; }
+
+      // Apps Script retorna: { income: [...], expenses: [...] }
+      // income items:   { date, description, amount }
+      // expense items:  { date, description, amount, status }
+      const toItem = (x) => ({
+        id: uid(),
+        desc: x.description || x.descricao || x.desc || "",
+        valor: parseFloat(x.amount || x.valor) || 0,
+        date: x.date || x.data || today,
+      });
+
+      const novasReceitas = (j.income || j.receitas || []).map(toItem);
+      const todasDespesas = (j.expenses || j.despesas || []);
+      // Separa investimentos das despesas pelo status ou descrição
+      const novasDespesas = todasDespesas
+        .filter(x => !String(x.description||x.descricao||"").toLowerCase().includes("invest") &&
+                     !String(x.description||x.descricao||"").toLowerCase().includes("aplicaç"))
+        .map(toItem);
+      const novosInvest = todasDespesas
+        .filter(x => String(x.description||x.descricao||"").toLowerCase().includes("invest") ||
+                     String(x.description||x.descricao||"").toLowerCase().includes("aplicaç"))
+        .map(toItem);
+
+      const totalRec = novasReceitas.reduce((s,x)=>s+x.valor,0);
+      const totalDesp = novasDespesas.reduce((s,x)=>s+x.valor,0);
+      const totalInv = novosInvest.reduce((s,x)=>s+x.valor,0);
+
       setData(d => d.map((m, i) => {
         if (i !== syncMonth) return m;
-        const receitas = (j.receitas||[]).map(x => ({ id:uid(), desc:x.descricao||x.desc||"", valor:parseFloat(x.valor)||0, date:x.data||today }));
-        const despesas = (j.despesas||[]).map(x => ({ id:uid(), desc:x.descricao||x.desc||"", valor:parseFloat(x.valor)||0, date:x.data||today }));
-        const investimentos = (j.investimentos||[]).map(x => ({ id:uid(), desc:x.descricao||x.desc||"", valor:parseFloat(x.valor)||0, date:x.data||today }));
-        return { ...m, receitas:[...m.receitas, ...receitas], despesas:[...m.despesas, ...despesas], investimentos:[...m.investimentos, ...investimentos] };
+        return {
+          ...m,
+          receitas: [...m.receitas, ...novasReceitas],
+          despesas: [...m.despesas, ...novasDespesas],
+          investimentos: [...m.investimentos, ...novosInvest],
+        };
       }));
-      setSyncStatus({ ok:true, msg:`✅ Dados de ${MONTHS[syncMonth]} importados com sucesso!` });
-      showToast(`Planilha de ${MONTHS[syncMonth]} importada!`);
+      setSyncStatus({ ok:true, msg:`✅ ${MONTHS[syncMonth]} importado! ${novasReceitas.length} receitas (${new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(totalRec)}) • ${novasDespesas.length} despesas (${new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(totalDesp)})` });
+      showToast(`✅ Planilha de ${MONTHS[syncMonth]} importada!`);
     } catch (e) { setSyncStatus({ ok:false, msg:"Erro ao ler planilha. Verifique a URL e o script." }); }
     setSyncing(false);
   };
