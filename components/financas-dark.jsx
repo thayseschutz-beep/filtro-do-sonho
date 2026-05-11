@@ -1067,6 +1067,13 @@ Cancelar = Dar baixa só nesta parcela`);
         {/* ── CARTÕES ── */}
         {activeSection==="cartoes"&&(
           <div>
+            {/* Sub-tabs horizontais — essencial no mobile onde sidebar some */}
+            <div style={{display:"flex",gap:"6px",marginBottom:"16px",flexWrap:"wrap",overflowX:"auto",paddingBottom:"4px"}}>
+              {[["cadastro","📋","Cadastro"],["uso","🛒","Uso"],["faturas","📄","Faturas"],["relatorio_c","📊","Relatório"],["dashcard","🖥️","Dashboard"]].map(([k,ic,l])=>(
+                <button key={k} style={{...subT(cardSub===k),whiteSpace:"nowrap",flexShrink:0}} onClick={()=>setCardSub(k)}>{ic} {l}</button>
+              ))}
+            </div>
+
             {cardSub==="cadastro"&&(
               <div>
                 <div style={card()}>
