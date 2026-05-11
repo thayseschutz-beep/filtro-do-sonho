@@ -429,7 +429,6 @@ export default function App(){
     setPagamentoModal(null);
   };
 
-  const isPago=(cid,y,m)=>{const v=pagamentos[`${cid}_${y}_${m}`];return v===true||v?.pago===true;};
   const isPagoParcial=(cid,y,m)=>{const v=pagamentos[`${cid}_${y}_${m}`];return v?.pagoParcial===true;};
   const getValorPago=(cid,y,m)=>{const v=pagamentos[`${cid}_${y}_${m}`];if(v===true)return null;return v?.valorPago||0;};
   const getSaldoDevedor=(cid,y,m)=>{const v=pagamentos[`${cid}_${y}_${m}`];return v?.saldoDevedor||0;};
