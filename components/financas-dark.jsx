@@ -443,7 +443,7 @@ export default function App(){
   // Parcelados: provisão dos próximos meses
   const proximosParcelados=yrMs.filter(m=>m>currentMonth).map(m=>({
     month:m,
-    despesas:sumArr(safeData[m].despesas.filter(x=>x.parcelaGroupId)),
+    despesas:sumArr(safeData[m].despesas.filter(x=>x.parcelaGroupId||x.recorrenteGroupId)),
     emprestimos:sumArr(safeData[m].emprestimos.filter(x=>x.parcelaGroupId)),
   })).filter(m=>m.despesas>0||m.emprestimos>0).slice(0,4);
   const despConfirmada=sumArr(monthData.despesas.filter(x=>x.pago));
@@ -509,8 +509,38 @@ export default function App(){
         showToast(`✅ ${criadas} parcelas distribuídas (${MONTHS[startMonth]} a ${MONTHS[Math.min(startMonth+parcelas-1,11)]})`);
         return;
       }
+      // ── RECORRENTE: distribui do mês de início até dezembro ───────
+      if(f.recorrente){
+        const startMonth=new Date(f.data+"T12:00:00").getMonth();
+        const groupId=uid();
+        const nd=safeData.map(m=>({...m,despesas:[...m.despesas]}));
+        let criadas=0;
+        for(let i=startMonth;i<=11;i++){
+          nd[i].despesas.push({
+            id:uid(),
+            desc:f.desc,
+            valor:valorTotal,
+            date:f.data,
+            ref:f.ref,
+            fornecedor:f.fornecedor,
+            recorrente:true,
+            recorrenteGroupId:groupId,
+            mesRecorrente:i+1,
+            formaPag:f.formaPag,
+            parcelas:1,
+            meioPag:f.meioPag,
+            pago:f.pago,
+          });
+          criadas++;
+        }
+        setData(nd);
+        setDespForm(emptyDespForm(today));
+        setShowModal(null);
+        showToast(`🔁 Despesa recorrente criada em ${criadas} meses (${MONTHS[startMonth]} a Dezembro)`);
+        return;
+      }
       // ── À VISTA ───────────────────────────────────────────────────
-      item={id:uid(),desc:f.desc,valor:valorTotal,date:f.data,ref:f.ref,fornecedor:f.fornecedor,recorrente:f.recorrente,formaPag:f.formaPag,parcelas:1,meioPag:f.meioPag,pago:f.pago};
+      item={id:uid(),desc:f.desc,valor:valorTotal,date:f.data,ref:f.ref,fornecedor:f.fornecedor,recorrente:false,formaPag:f.formaPag,parcelas:1,meioPag:f.meioPag,pago:f.pago};
       setDespForm(emptyDespForm(today));
     } else if(tipo==="investimento"){
       f=invForm; key="investimentos";
@@ -553,6 +583,27 @@ export default function App(){
     const key=tipo==="receita"?"receitas":tipo==="despesa"?"despesas":tipo==="investimento"?"investimentos":"emprestimos";
     const allMonthItems=safeData.flatMap(m=>m[key]);
     const targetItem=allMonthItems.find(x=>x.id===id);
+
+    // RECORRENTE: encerrar a partir deste mês ou só este
+    if(targetItem?.recorrenteGroupId){
+      const gid=targetItem.recorrenteGroupId;
+      const mesDeste=targetItem.mesRecorrente||currentMonth+1;
+      const totalGrupo=safeData.reduce((s,m)=>s+m[key].filter(x=>x.recorrenteGroupId===gid).length,0);
+      if(totalGrupo>1){
+        const opcao=confirm(`🔁 "${targetItem.desc}" — despesa recorrente.
+
+OK = Encerrar a partir de ${MONTHS[mesDeste-1]} (remove este e próximos)
+Cancelar = Remover APENAS este mês`);
+        if(opcao){
+          setData(d=>d.map((m,i)=>i>=(mesDeste-1)?{...m,[key]:m[key].filter(x=>x.recorrenteGroupId!==gid)}:m));
+          showToast("🔁 Despesa recorrente encerrada a partir de "+MONTHS[mesDeste-1]);
+          return;
+        }
+        setData(d=>d.map((m,i)=>i===(mesDeste-1)?{...m,[key]:m[key].filter(x=>x.id!==id)}:m));
+        return;
+      }
+    }
+
     if(targetItem?.parcelaGroupId){
       const gid=targetItem.parcelaGroupId;
       const totalGrupo=safeData.reduce((s,m)=>s+m[key].filter(x=>x.parcelaGroupId===gid).length,0);
@@ -578,6 +629,20 @@ Cancelar = Remover só esta parcela`);
     const targetItem=safeData[currentMonth][key].find(x=>x.id===id);
     const jaConfirmado=!!targetItem?.[statusField];
 
+    // Recorrente: baixar este ou todos
+    if(!jaConfirmado&&targetItem?.recorrenteGroupId){
+      const gid=targetItem.recorrenteGroupId;
+      const mesDeste=targetItem.mesRecorrente||currentMonth+1;
+      const restantes=safeData.reduce((s,m,i)=>s+m[key].filter(x=>x.recorrenteGroupId===gid&&!x[statusField]&&(i+1)>=mesDeste).length,0);
+      if(restantes>1){
+        const baixarTodos=confirm("Dar baixa em: "+targetItem.desc+" (recorrente)\n\nOK = Todos os meses restantes ("+restantes+")\nCancelar = Somente "+MONTHS[mesDeste-1]);
+        if(baixarTodos){
+          setData(d=>d.map((m,i)=>i>=(mesDeste-1)?{...m,[key]:m[key].map(x=>x.recorrenteGroupId===gid?{...x,[statusField]:true,dataBaixa}:x)}:m));
+          showToast("Baixa dada em todos os meses recorrentes!");
+          return;
+        }
+      }
+    }
     // Se é parcela de um grupo e ainda não foi confirmada, oferece opção de baixar todas
     if(!jaConfirmado&&targetItem?.parcelaGroupId){
       const gid=targetItem.parcelaGroupId;
