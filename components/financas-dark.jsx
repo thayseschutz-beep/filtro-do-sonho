@@ -9,7 +9,7 @@ const CASAL_ID = "casal";
 // ── Constants ─────────────────────────────────────────────────────────────
 const MONTHS = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const MS = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
-const CARD_COLORS = ["#7C3AED","#EF4444","#0EA5E9","#22C55E","#F59E0B","#EC4899","#8B5CF6","#14B8A6"];
+const CARD_COLORS = ["#166534","#EF4444","#0EA5E9","#22C55E","#F59E0B","#EC4899","#8B5CF6","#14B8A6"];
 const fmt = (v) => new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(v||0);
 const fmtK = (v) => Math.abs(v||0)>=1000?`R$${((v||0)/1000).toFixed(1)}k`:`R$${(v||0).toFixed(0)}`;
 const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2);
@@ -26,7 +26,7 @@ const T = {
   bg:"#F1F5F9",surface:"#FFFFFF",surfaceAlt:"#F8FAFC",
   border:"#E2E8F0",borderStrong:"#CBD5E1",
   text:"#0F172A",textSub:"#64748B",textMuted:"#94A3B8",
-  purple:"#7C3AED",purpleLight:"#EDE9FE",
+  purple:"#166534",purpleLight:"#DCFCE7",
   green:"#16A34A",greenLight:"#DCFCE7",
   red:"#DC2626",redLight:"#FEE2E2",
   blue:"#0284C7",blueLight:"#E0F2FE",
@@ -760,8 +760,8 @@ Cancelar = Dar baixa só nesta parcela`);
       {/* SIDEBAR */}
       <div style={{width:sw,background:T.surface,borderRight:`1px solid ${T.border}`,display:isMobile?"none":"flex",flexDirection:"column",position:"fixed",top:0,left:0,bottom:0,zIndex:100,transition:"width 0.25s",overflow:"hidden",boxShadow:"1px 0 0 #E2E8F0"}}>
         <div style={{padding:"18px 14px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:"10px",whiteSpace:"nowrap"}}>
-          <div style={{width:"34px",height:"34px",borderRadius:"10px",flexShrink:0,background:"linear-gradient(135deg,#7C3AED,#0EA5E9)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"17px"}}>💰</div>
-          {sidebarOpen&&<div><div style={{fontSize:"14px",fontWeight:700,color:T.text}}>Planejamento</div><div style={{fontSize:"11px",color:T.textSub}}>Financeiro</div></div>}
+          <div style={{width:"34px",height:"34px",borderRadius:"10px",flexShrink:0,background:"linear-gradient(135deg,#166534,#22C55E)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"17px"}}>🌱</div>
+          {sidebarOpen&&<div><div style={{fontSize:"16px",fontWeight:700,color:T.text}}>Green<span style={{color:"#22C55E"}}>Mind</span></div><div style={{fontSize:"10px",color:T.textSub,letterSpacing:"1px"}}>FINANCIAL PLANNING</div></div>}
         </div>
         <nav style={{flex:1,padding:"10px 8px",display:"flex",flexDirection:"column",gap:"2px",overflowY:"auto"}}>
           {navItems.map(n=>(
@@ -800,7 +800,7 @@ Cancelar = Dar baixa só nesta parcela`);
             <h1 style={{fontSize:"20px",fontWeight:700,color:T.text,margin:0}}>
               {{dashboard:"Dashboard",lancamentos:"Lançamentos",relatorio:"Relatório Anual",cartoes:"Cartões de Crédito",cadastros:"Cadastros",sincronizar:"Sincronizar com Google Sheets"}[activeSection]}
             </h1>
-            <p style={{color:T.textSub,fontSize:"13px",margin:"2px 0 0"}}>Planejamento Financeiro Pessoal • {CY}</p>
+            <p style={{color:T.textSub,fontSize:"13px",margin:"2px 0 0"}}>GreenMind — Financial Planning • {CY}</p>
           </div>
           {activeSection!=="cartoes"&&activeSection!=="cadastros"&&activeSection!=="sincronizar"&&(
             <div style={{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}}>
