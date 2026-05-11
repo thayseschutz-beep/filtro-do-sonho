@@ -296,6 +296,8 @@ export default function App(){
   const [syncPreview, setSyncPreview] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [faturaDetalhe, setFaturaDetalhe] = useState(null); // {cartaoId, month, year}
+  const [pagamentoModal, setPagamentoModal] = useState(null); // {cartaoId, month, year, valorFatura, nomeCartao}
+  const [pagForm, setPagForm] = useState({tipo:"total", valor:"", data:"", obs:""});
   const [editUso, setEditUso] = useState(null); // for editing a credit card purchase
   const [showLote, setShowLote] = useState(false);
   const [loteText, setLoteText] = useState("");
@@ -384,15 +386,56 @@ export default function App(){
 
   const getFat=(cid,y,m)=>fatMap[`${cid}_${y}_${m}`]||0;
   const isPago=(cid,y,m)=>{const v=pagamentos[`${cid}_${y}_${m}`];return v===true||v?.pago===true;};
-  const togglePago=async(cid,y,m,dataPag)=>{
-    const key=`${cid}_${y}_${m}`;
-    const jaEhPago=!!pagamentos[key]?.pago||pagamentos[key]===true;
-    const np={...pagamentos,[key]:jaEhPago?false:{pago:true,data:dataPag||today}};
-    setPagamentos(np);
-    try{await saveToSupa({data:safeData,cartoes,uso_cartoes:usoCartoes,pagamentos:np,sync_url:syncUrl,cadastros});}catch(_){}
+  const abrirPagamentoModal=(cid,y,m)=>{
+    const card=cartoes.find(c=>c.id===cid);
+    const vFatura=getFat(cid,y,m);
+    const pagAtual=pagamentos[`${cid}_${y}_${m}`];
+    const jaEhPago=pagAtual===true||pagAtual?.pago===true;
+    if(jaEhPago){
+      // Já pago: confirma se quer desmarcar
+      if(confirm("Esta fatura já está marcada como paga. Desmarcar?")) {
+        const np={...pagamentos,[`${cid}_${y}_${m}`]:null};
+        setPagamentos(np);
+        saveToSupa({data:safeData,cartoes,uso_cartoes:usoCartoes,pagamentos:np,sync_url:syncUrl,cadastros}).catch(()=>{});
+      }
+      return;
+    }
+    const saldoRestante=pagAtual?.pagoParcial?vFatura-(pagAtual?.valorPago||0):vFatura;
+    setPagForm({tipo:"total",valor:saldoRestante.toFixed(2),data:today,obs:""});
+    setPagamentoModal({cartaoId:cid,year:y,month:m,valorFatura:vFatura,saldoRestante,nomeCartao:card?.nome||"Cartão"});
   };
-  const isFaturaPaga=(cid,y,m)=>{const v=pagamentos[`${cid}_${y}_${m}`];return v===true||v?.pago===true;};
+
+  const confirmarPagamento=async()=>{
+    if(!pagamentoModal)return;
+    const{cartaoId,year,month,valorFatura}=pagamentoModal;
+    const key=`${cartaoId}_${year}_${month}`;
+    const valorPago=parseFloat(pagForm.valor)||0;
+    const pagAtual=pagamentos[key];
+    const totalJaPago=pagAtual?.pagoParcial?(pagAtual?.valorPago||0):0;
+    const totalAcumulado=totalJaPago+valorPago;
+    const pagamentoTotal=pagForm.tipo==="total"||totalAcumulado>=valorFatura-0.01;
+    const np={...pagamentos,[key]:{
+      pago:pagamentoTotal,
+      pagoParcial:!pagamentoTotal,
+      valorPago:totalAcumulado,
+      saldoDevedor:Math.max(0,valorFatura-totalAcumulado),
+      data:pagForm.data||today,
+      obs:pagForm.obs,
+      tipo:pagForm.tipo,
+      historico:[...(pagAtual?.historico||[]),{valor:valorPago,data:pagForm.data||today,obs:pagForm.obs}],
+    }};
+    setPagamentos(np);
+    try{await saveToSupa({data:safeData,cartoes,uso_cartoes:usoCartoes,pagamentos:np,sync_url:syncUrl,cadastros});showToast(pagamentoTotal?"✅ Fatura paga integralmente!":"⚡ Pagamento parcial registrado!");}catch(_){showToast("Erro ao salvar","error");}
+    setPagamentoModal(null);
+  };
+
+  const isPago=(cid,y,m)=>{const v=pagamentos[`${cid}_${y}_${m}`];return v===true||v?.pago===true;};
+  const isPagoParcial=(cid,y,m)=>{const v=pagamentos[`${cid}_${y}_${m}`];return v?.pagoParcial===true;};
+  const getValorPago=(cid,y,m)=>{const v=pagamentos[`${cid}_${y}_${m}`];if(v===true)return null;return v?.valorPago||0;};
+  const getSaldoDevedor=(cid,y,m)=>{const v=pagamentos[`${cid}_${y}_${m}`];return v?.saldoDevedor||0;};
   const getDataPagamento=(cid,y,m)=>{const v=pagamentos[`${cid}_${y}_${m}`];return v?.data||"";};
+  // keep old togglePago for dashboard card usage
+  const togglePago=abrirPagamentoModal;
 
   const faturasMes=cartoes.reduce((s,c)=>s+getFat(c.id,CY,currentMonth),0);
   const faturasAbertas=faturasMes-cartoes.reduce((s,c)=>s+(isPago(c.id,CY,currentMonth)?getFat(c.id,CY,currentMonth):0),0);
@@ -1114,10 +1157,22 @@ Cancelar = Dar baixa só nesta parcela`);
                               const v=getFat(c.id,CY,m),pg=isPago(c.id,CY,m),past=m<nowM;
                               return <td key={m} style={{padding:"8px 10px"}}>
                                 {faturaTab==="apagar"&&v>0?<div style={{display:"flex",flexDirection:"column",gap:"3px",alignItems:"center"}}>
-                                  <button style={{background:pg?"#DCFCE7":"#FEE2E2",border:`1px solid ${pg?"#BBF7D0":"#FECACA"}`,color:pg?T.green:T.red,borderRadius:"5px",padding:"2px 8px",fontSize:"10px",fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}} onClick={()=>{
-                                    if(pg){togglePago(c.id,CY,m);}
-                                    else{const d=prompt(`Data de pagamento (${MONTHS[m]}):`,today);if(d!==null)togglePago(c.id,CY,m,d||today);}
-                                  }}>{pg?`✓ ${getDataPagamento(c.id,CY,m)||"Pago"}`:fmt(v)}</button>
+                                  {isPago(c.id,CY,m)?(
+                                    <button style={{background:"#DCFCE7",border:"1px solid #BBF7D0",color:T.green,borderRadius:"5px",padding:"2px 8px",fontSize:"10px",fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}} onClick={()=>abrirPagamentoModal(c.id,CY,m)}>
+                                      ✓ {getDataPagamento(c.id,CY,m)||"Pago"}
+                                    </button>
+                                  ):isPagoParcial(c.id,CY,m)?(
+                                    <div style={{textAlign:"center"}}>
+                                      <button style={{background:"#FEF3C7",border:"1px solid #FDE68A",color:T.amber,borderRadius:"5px",padding:"2px 8px",fontSize:"10px",fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",display:"block",marginBottom:"2px"}} onClick={()=>abrirPagamentoModal(c.id,CY,m)}>
+                                        ⚡ {fmt(getValorPago(c.id,CY,m))} pago
+                                      </button>
+                                      <span style={{fontSize:"9px",color:T.red}}>Saldo: {fmt(getSaldoDevedor(c.id,CY,m))}</span>
+                                    </div>
+                                  ):(
+                                    <button style={{background:"#FEE2E2",border:"1px solid #FECACA",color:T.red,borderRadius:"5px",padding:"2px 8px",fontSize:"10px",fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}} onClick={()=>abrirPagamentoModal(c.id,CY,m)}>
+                                      💳 {fmt(v)}
+                                    </button>
+                                  )}
                                   <button style={{background:T.blueLight,border:`1px solid #BAE6FD`,color:T.blue,borderRadius:"4px",padding:"1px 6px",fontSize:"9px",cursor:"pointer"}} onClick={()=>setFaturaDetalhe({cartaoId:c.id,month:m,year:CY,faturaTab})}>🔍 ver</button>
                                 </div>:
                                 faturaTab==="pagamentos"&&pg?<span style={{color:T.green,fontWeight:700,fontSize:"11px"}}>✓ {fmt(v)}</span>:
@@ -1379,6 +1434,74 @@ Cancelar = Dar baixa só nesta parcela`);
             <div style={{display:"flex",gap:"8px",marginTop:"14px",justifyContent:"flex-end"}}>
               <button style={btnP(T.purple)} onClick={()=>{try{const imp=JSON.parse(document.getElementById("importArea").value);if(imp.data&&Array.isArray(imp.data)){setData(imp.data);if(imp.cartoes)setCartoes(imp.cartoes);if(imp.usoCartoes)setUsoCartoes(imp.usoCartoes);if(imp.pagamentos)setPagamentos(imp.pagamentos);if(imp.cadastros)setCadastros({...emptyCadastros(),...imp.cadastros});setShowImport(false);showToast("Importado!");}else showToast("Formato inválido","error");}catch{showToast("JSON inválido","error");}}}>✓ Importar</button>
               <button style={btnG} onClick={()=>setShowImport(false)}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PAYMENT MODAL */}
+      {pagamentoModal&&(
+        <div style={{position:"fixed",inset:0,zIndex:600,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}} onClick={()=>setPagamentoModal(null)}>
+          <div style={{background:T.surface,border:`2px solid ${T.green}30`,borderRadius:"18px",padding:"24px",width:"480px",maxWidth:"96vw",boxShadow:shadowMd}} onClick={e=>e.stopPropagation()}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"16px"}}>
+              <h3 style={{color:T.text,margin:0,fontSize:"16px",fontWeight:700,borderLeft:`4px solid ${T.green}`,paddingLeft:"10px"}}>💳 Pagamento de Fatura</h3>
+              <button style={{...btnG,padding:"4px 10px"}} onClick={()=>setPagamentoModal(null)}>✕</button>
+            </div>
+
+            <div style={{background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:"12px",padding:"14px",marginBottom:"16px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
+                <span style={{fontSize:"13px",fontWeight:600,color:T.text}}>{pagamentoModal.nomeCartao}</span>
+                <span style={{fontSize:"13px",color:T.textSub}}>{MONTHS[pagamentoModal.month]} {pagamentoModal.year}</span>
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between"}}>
+                <span style={{fontSize:"12px",color:T.textSub}}>Valor total da fatura:</span>
+                <span style={{fontSize:"16px",fontWeight:700,color:T.red}}>{fmt(pagamentoModal.valorFatura)}</span>
+              </div>
+              {pagamentoModal.saldoRestante<pagamentoModal.valorFatura&&(
+                <div style={{display:"flex",justifyContent:"space-between",marginTop:"4px"}}>
+                  <span style={{fontSize:"12px",color:T.textSub}}>Saldo restante:</span>
+                  <span style={{fontSize:"14px",fontWeight:700,color:T.amber}}>{fmt(pagamentoModal.saldoRestante)}</span>
+                </div>
+              )}
+            </div>
+
+            <RadioGroup label="Tipo de Pagamento" value={pagForm.tipo} onChange={v=>{setPagForm(f=>({...f,tipo:v,valor:v==="total"?pagamentoModal.saldoRestante.toFixed(2):f.valor}));}}
+              options={[{value:"total",label:`Total ${fmt(pagamentoModal.saldoRestante)}`},{value:"parcial",label:"Parcial"}]}/>
+
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginBottom:"12px"}}>
+              <div>
+                <label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Valor a pagar (R$)</label>
+                <input type="number" step="0.01" style={inpS} value={pagForm.valor}
+                  readOnly={pagForm.tipo==="total"}
+                  onChange={e=>setPagForm(f=>({...f,valor:e.target.value}))}
+                  placeholder="0,00"/>
+              </div>
+              <div>
+                <label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Data do pagamento</label>
+                <input type="date" style={inpDate} value={pagForm.data} onChange={e=>setPagForm(f=>({...f,data:e.target.value}))}/>
+              </div>
+            </div>
+
+            <div style={{marginBottom:"12px"}}>
+              <label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Observação (opcional)</label>
+              <input style={inpS} placeholder="Ex: Pagamento mínimo, débito automático..." value={pagForm.obs} onChange={e=>setPagForm(f=>({...f,obs:e.target.value}))}/>
+            </div>
+
+            {pagForm.tipo==="parcial"&&parseFloat(pagForm.valor)>0&&(
+              <div style={{background:T.amberLight,border:"1px solid #FDE68A",borderRadius:"8px",padding:"10px 14px",marginBottom:"12px"}}>
+                <p style={{fontSize:"12px",color:T.amber,fontWeight:600,margin:"0 0 2px"}}>⚡ Pagamento parcial</p>
+                <p style={{fontSize:"12px",color:"#92400E",margin:0}}>
+                  Valor a pagar: <strong>{fmt(parseFloat(pagForm.valor)||0)}</strong> •
+                  Saldo devedor restante: <strong>{fmt(Math.max(0,pagamentoModal.saldoRestante-(parseFloat(pagForm.valor)||0)))}</strong>
+                </p>
+              </div>
+            )}
+
+            <div style={{display:"flex",gap:"8px",justifyContent:"flex-end",paddingTop:"14px",borderTop:`1px solid ${T.border}`}}>
+              <button style={btnP(T.green)} onClick={confirmarPagamento}>
+                ✅ {pagForm.tipo==="total"?"Confirmar Pagamento Total":"Registrar Pagamento Parcial"}
+              </button>
+              <button style={btnG} onClick={()=>setPagamentoModal(null)}>Cancelar</button>
             </div>
           </div>
         </div>
