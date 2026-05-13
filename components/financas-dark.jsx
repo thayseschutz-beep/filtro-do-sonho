@@ -14,6 +14,17 @@ const fmt = (v) => new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL
 const fmtK = (v) => Math.abs(v||0)>=1000?`R$${((v||0)/1000).toFixed(1)}k`:`R$${(v||0).toFixed(0)}`;
 const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2);
 const sumArr = (arr) => (arr||[]).reduce((s,x)=>s+(x.valor||0),0);
+const LIMITE_MEI_ANUAL = 81000;
+const LIMITE_MEI_MENSAL = LIMITE_MEI_ANUAL / 12; // R$ 6.750
+const DAS_MEI_2026 = { inss: 75.90, iss: 5.00, icms: 1.00, totalServicos: 80.90, totalComercio: 76.90 };
+const emptyMei = () => ({
+  meis: [
+    { id:"thayse", nome:"Thayse", cor:"#7C3AED", limiteAnual:81000, tipo:"servicos" },
+    { id:"lucas",  nome:"Lucas",  cor:"#0284C7", limiteAnual:81000, tipo:"servicos" },
+  ],
+  notas: []
+});
+const emptyNFForm = () => ({ meiId:"", competencia:"", numeroNF:"", valor:"", prestador:"", tomador:"", descricao:"" });
 const emptyYear = () => Array.from({length:12},(_,i)=>({month:i,receitas:[],despesas:[],investimentos:[],emprestimos:[]}));
 const emptyCadastros = () => ({bancos:[],fornecedores:[],pessoas:[],catReceitas:[],catDespesas:[],catInvestimentos:[]});
 const emptyRecForm = (today) => ({data:today,desc:"",ref:"",cliente:"",valor:"",formaRec:"pix",banco:""});
@@ -299,6 +310,11 @@ export default function App(){
   const [pagamentoModal, setPagamentoModal] = useState(null); // {cartaoId, month, year, valorFatura, nomeCartao}
   const [pagForm, setPagForm] = useState({tipo:"total", valor:"", data:"", obs:""});
   const [editUso, setEditUso] = useState(null); // for editing a credit card purchase
+  const [meiData, setMeiData] = useState(emptyMei());
+  const [meiTab, setMeiTab] = useState("lancamentos");
+  const [meiVisualMonth, setMeiVisualMonth] = useState(new Date().toISOString().slice(0,7));
+  const [nfForm, setNfForm] = useState(emptyNFForm());
+  const [editMei, setEditMei] = useState(null);
   const [showLote, setShowLote] = useState(false);
   const [loteText, setLoteText] = useState("");
   const [showImport, setShowImport] = useState(false);
@@ -325,6 +341,7 @@ export default function App(){
           if(row.pagamentos&&typeof row.pagamentos==="object")setPagamentos(row.pagamentos);
           if(row.sync_url)setSyncUrl(row.sync_url);
           if(row.cadastros&&typeof row.cadastros==="object")setCadastros({...emptyCadastros(),...row.cadastros});
+          if(row.mei_data&&typeof row.mei_data==="object")setMeiData({...emptyMei(),...row.mei_data,meis:(row.mei_data.meis||emptyMei().meis),notas:Array.isArray(row.mei_data.notas)?row.mei_data.notas:[]});
         }
       } catch(e){console.error("Load error",e);}
     };
@@ -341,6 +358,7 @@ export default function App(){
         if(row.uso_cartoes&&Array.isArray(row.uso_cartoes))setUsoCartoes(row.uso_cartoes);
         if(row.pagamentos&&typeof row.pagamentos==="object")setPagamentos(row.pagamentos);
         if(row.cadastros&&typeof row.cadastros==="object")setCadastros({...emptyCadastros(),...row.cadastros});
+        if(row.mei_data&&typeof row.mei_data==="object")setMeiData({...emptyMei(),...row.mei_data,meis:(row.mei_data.meis||emptyMei().meis),notas:Array.isArray(row.mei_data.notas)?row.mei_data.notas:[]});
         showToast("🔄 Atualizado!");
       }).subscribe();
     return()=>supabase.removeChannel(ch);
@@ -356,6 +374,7 @@ export default function App(){
       pagamentos:payload.pagamentos||{},
       sync_url:payload.sync_url||"",
       cadastros:payload.cadastros||emptyCadastros(),
+      mei_data:payload.mei_data||emptyMei(),
     });
     if(error)throw error;
   };
@@ -746,7 +765,7 @@ Cancelar = Dar baixa só nesta parcela`);
   };
 
   // nav
-  const navItems=[{key:"dashboard",icon:"📊",label:"Dashboard"},{key:"lancamentos",icon:"✏️",label:"Lançamentos"},{key:"relatorio",icon:"📈",label:"Relatório"},{key:"cartoes",icon:"💳",label:"Cartões"},{key:"cadastros",icon:"🗂️",label:"Cadastros"},{key:"sincronizar",icon:"🔄",label:"Sincronizar"}];
+  const navItems=[{key:"dashboard",icon:"📊",label:"Dashboard"},{key:"lancamentos",icon:"✏️",label:"Lançamentos"},{key:"relatorio",icon:"📈",label:"Relatório"},{key:"cartoes",icon:"💳",label:"Cartões"},{key:"cadastros",icon:"🗂️",label:"Cadastros"},{key:"mei",icon:"🏢",label:"MEI"},{key:"sincronizar",icon:"🔄",label:"Sincronizar"}];
   const cardSubNav=[["cadastro","📋","Cadastro"],["uso","🛒","Uso de Cartões"],["faturas","📄","Faturas"],["relatorio_c","📊","Relatório"],["dashcard","🖥️","Dashboard"]];
   const cadSubNav=[["bancos","🏦","Bancos"],["fornecedores","🏢","Fornecedores"],["pessoas","👤","Pessoas"]];
   const lancTabs=[{key:"receita",label:"📥 Receitas",col:T.green},{key:"despesa",label:"📤 Despesas",col:T.red},{key:"investimento",label:"💎 Investimentos",col:T.blue},{key:"emprestimo",label:"🔄 Empréstimos",col:T.amber}];
@@ -798,11 +817,11 @@ Cancelar = Dar baixa só nesta parcela`);
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"20px",flexWrap:"wrap",gap:"12px"}}>
           <div>
             <h1 style={{fontSize:"20px",fontWeight:700,color:T.text,margin:0}}>
-              {{dashboard:"Dashboard",lancamentos:"Lançamentos",relatorio:"Relatório Anual",cartoes:"Cartões de Crédito",cadastros:"Cadastros",sincronizar:"Sincronizar com Google Sheets"}[activeSection]}
+              {{dashboard:"Dashboard",lancamentos:"Lançamentos",relatorio:"Relatório Anual",cartoes:"Cartões de Crédito",cadastros:"Cadastros",mei:"🏢 Gestão MEI",sincronizar:"Sincronizar com Google Sheets"}[activeSection]}
             </h1>
             <p style={{color:T.textSub,fontSize:"13px",margin:"2px 0 0"}}>GreenMind — Financial Planning • {CY}</p>
           </div>
-          {activeSection!=="cartoes"&&activeSection!=="cadastros"&&activeSection!=="sincronizar"&&(
+          {activeSection!=="cartoes"&&activeSection!=="cadastros"&&activeSection!=="sincronizar"&&activeSection!=="mei"&&(
             <div style={{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}}>
               {!isMobile&&<div style={{display:"flex",background:T.surfaceAlt,borderRadius:"10px",padding:"3px",border:`1px solid ${T.border}`,gap:"2px"}}>
                 {["mes","ano"].map(v=><button key={v} style={toggleB(view===v)} onClick={()=>setView(v)}>{v==="mes"?"Mês":"Ano"}</button>)}
@@ -1378,6 +1397,517 @@ Cancelar = Dar baixa só nesta parcela`);
           </div>
         )}
 
+        {/* ── MEI ── */}
+        {activeSection==="mei"&&(()=>{
+          const { meis, notas } = meiData;
+          const CY_STR = String(CY);
+
+          // helpers
+          const faturadoMes = (meiId, comp) => notas.filter(n=>n.meiId===meiId&&n.competencia===comp).reduce((s,n)=>s+parseFloat(n.valor||0),0);
+          const faturadoAno = (meiId) => notas.filter(n=>n.meiId===meiId&&n.competencia?.startsWith(CY_STR)).reduce((s,n)=>s+parseFloat(n.valor||0),0);
+          const notasMes = (meiId, comp) => notas.filter(n=>n.meiId===meiId&&n.competencia===comp);
+          const notasAnoMei = (meiId) => notas.filter(n=>n.meiId===meiId&&n.competencia?.startsWith(CY_STR));
+          const mesesComDados = (meiId) => {
+            const set = new Set(notas.filter(n=>n.meiId===meiId&&n.competencia?.startsWith(CY_STR)).map(n=>n.competencia));
+            return set.size;
+          };
+          const projecaoAnual = (meiId) => {
+            const m = mesesComDados(meiId);
+            if(m===0) return 0;
+            return (faturadoAno(meiId)/m)*12;
+          };
+          const restanteLimite = (meiId) => {
+            const mei = meis.find(m=>m.id===meiId);
+            return Math.max(0,(mei?.limiteAnual||LIMITE_MEI_ANUAL)-faturadoAno(meiId));
+          };
+          const mediaMensalSegura = (meiId) => {
+            const mei = meis.find(m=>m.id===meiId);
+            const mAtual = new Date().getMonth();
+            const mesesRestantes = 12-mAtual;
+            return mesesRestantes>0?restanteLimite(meiId)/mesesRestantes:0;
+          };
+          const pctLimite = (valor, limiteAnual) => Math.min(100,(valor/(limiteAnual||LIMITE_MEI_ANUAL))*100);
+
+          const addNF = () => {
+            const { meiId, competencia, numeroNF, valor, prestador, tomador, descricao } = nfForm;
+            if(!meiId||!competencia||!valor) { showToast("Preencha MEI, competência e valor","error"); return; }
+            const novaNotaFiscal = { id:uid(), meiId, competencia, numeroNF, valor:parseFloat(valor)||0, prestador, tomador, descricao, dataCad:today };
+            setMeiData(d=>({...d, notas:[...d.notas, novaNotaFiscal]}));
+            setNfForm(emptyNFForm());
+            showToast("NF registrada!");
+          };
+
+          const removeNF = (id) => { setMeiData(d=>({...d, notas:d.notas.filter(n=>n.id!==id)})); };
+
+          // Color for a MEI
+          const meiCor = (meiId) => meis.find(m=>m.id===meiId)?.cor||T.purple;
+          const meiNome = (meiId) => meis.find(m=>m.id===meiId)?.nome||meiId;
+
+          // chart data for visual mensal
+          const mesesChart = Array.from({length:12},(_,i)=>{
+            const comp = CY_STR+"-"+String(i+1).padStart(2,"0");
+            const obj = { name:MS[i] };
+            meis.forEach(m=>{ obj[m.nome]=faturadoMes(m.id,comp); });
+            return obj;
+          });
+
+          return (
+            <div>
+              {/* Sub-tabs */}
+              <div style={{display:"flex",gap:"6px",marginBottom:"16px",flexWrap:"wrap"}}>
+                {[["lancamentos","📝","Lançamentos"],["mensal","📅","Visão Mensal"],["anual","📊","Visão Anual"],["config","⚙️","Config"]].map(([k,ic,l])=>(
+                  <button key={k} style={{...subT(meiTab===k),whiteSpace:"nowrap"}} onClick={()=>setMeiTab(k)}>{ic} {l}</button>
+                ))}
+              </div>
+
+              {/* ── LANÇAMENTOS ── */}
+              {meiTab==="lancamentos"&&(
+                <div>
+                  {/* Form */}
+                  <div style={card()}>
+                    <p style={{fontSize:"13px",fontWeight:700,color:T.text,marginBottom:"14px"}}>📝 Registrar Nota Fiscal</p>
+                    <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:"10px",marginBottom:"12px"}}>
+                      <div>
+                        <label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>MEI *</label>
+                        <select style={selS} value={nfForm.meiId} onChange={e=>setNfForm(f=>({...f,meiId:e.target.value}))}>
+                          <option value="">Selecione o MEI</option>
+                          {meis.map(m=><option key={m.id} value={m.id}>{m.nome}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Competência *</label>
+                        <input type="month" style={inpS} value={nfForm.competencia} onChange={e=>setNfForm(f=>({...f,competencia:e.target.value}))}/>
+                      </div>
+                      <div>
+                        <label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Nº da NF</label>
+                        <input style={inpS} placeholder="Ex: 001" value={nfForm.numeroNF} onChange={e=>setNfForm(f=>({...f,numeroNF:e.target.value}))}/>
+                      </div>
+                      <div>
+                        <label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Valor (R$) *</label>
+                        <input type="number" step="0.01" style={inpS} placeholder="0,00" value={nfForm.valor} onChange={e=>setNfForm(f=>({...f,valor:e.target.value}))}/>
+                      </div>
+                      <div>
+                        <label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Prestador (quem emite)</label>
+                        <input style={inpS} placeholder="Nome do MEI" value={nfForm.prestador} onChange={e=>setNfForm(f=>({...f,prestador:e.target.value}))}/>
+                      </div>
+                      <div>
+                        <label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Tomador (cliente)</label>
+                        <input style={inpS} placeholder="Empresa/pessoa contratante" value={nfForm.tomador} onChange={e=>setNfForm(f=>({...f,tomador:e.target.value}))}/>
+                      </div>
+                      <div style={{gridColumn:"span 3"}}>
+                        <label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Descrição do serviço</label>
+                        <input style={inpS} placeholder="Ex: Serviços de contabilidade referente ao mês..." value={nfForm.descricao} onChange={e=>setNfForm(f=>({...f,descricao:e.target.value}))}/>
+                      </div>
+                    </div>
+                    <button style={btnP(T.green)} onClick={addNF}>+ Registrar NF</button>
+                  </div>
+
+                  {/* Cards de limite em tempo real */}
+                  {nfForm.competencia&&(
+                    <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(2,1fr)",gap:"12px",marginBottom:"14px"}}>
+                      {meis.map(m=>{
+                        const fatMes=faturadoMes(m.id,nfForm.competencia);
+                        const limMes=m.limiteAnual/12;
+                        const fatAno=faturadoAno(m.id);
+                        const limAnual=m.limiteAnual||LIMITE_MEI_ANUAL;
+                        const pctMes=pctLimite(fatMes,limMes);
+                        const pctAno=(fatAno/limAnual)*100;
+                        return(
+                          <div key={m.id} style={{...card({marginBottom:0}),border:`1px solid ${m.cor}30`}}>
+                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}}>
+                              <span style={{...chip(m.cor),fontSize:"12px"}}>{m.nome}</span>
+                              <span style={{fontSize:"11px",color:T.textSub}}>{nfForm.competencia.replace("-","/")}</span>
+                            </div>
+                            <div style={{marginBottom:"8px"}}>
+                              <div style={{display:"flex",justifyContent:"space-between",fontSize:"12px",marginBottom:"3px"}}>
+                                <span style={{color:T.textSub}}>Mês: {fmt(fatMes)}</span>
+                                <span style={{color:pctMes>100?T.red:T.textSub}}>Limite: {fmt(limMes)}</span>
+                              </div>
+                              <div style={{height:6,background:T.surfaceAlt,borderRadius:4,border:`1px solid ${T.border}`}}>
+                                <div style={{height:6,width:`${Math.min(100,pctMes)}%`,background:pctMes>90?T.red:pctMes>70?T.amber:m.cor,borderRadius:4,transition:"width 0.4s"}}/>
+                              </div>
+                            </div>
+                            <div>
+                              <div style={{display:"flex",justifyContent:"space-between",fontSize:"12px",marginBottom:"3px"}}>
+                                <span style={{color:T.textSub}}>Ano: {fmt(fatAno)}</span>
+                                <span style={{color:pctAno>100?T.red:T.textSub}}>{pctAno.toFixed(1)}% do limite</span>
+                              </div>
+                              <div style={{height:6,background:T.surfaceAlt,borderRadius:4,border:`1px solid ${T.border}`}}>
+                                <div style={{height:6,width:`${Math.min(100,pctAno)}%`,background:pctAno>90?T.red:pctAno>70?T.amber:m.cor,borderRadius:4,transition:"width 0.4s"}}/>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Tabela todas as NFs */}
+                  {notas.length>0&&(
+                    <div style={card()}>
+                      <p style={{fontSize:"13px",fontWeight:700,color:T.text,marginBottom:"12px"}}>📋 Notas Fiscais Registradas ({notas.length})</p>
+                      <div style={{overflowX:"auto"}}>
+                        <table style={{width:"100%",borderCollapse:"collapse",fontSize:"12px"}}>
+                          <thead>
+                            <tr style={{background:T.surfaceAlt}}>
+                              {["MEI","Competência","Nº NF","Valor","Prestador","Tomador","Descrição",""].map(h=>(
+                                <th key={h} style={{padding:"8px 10px",textAlign:"left",color:T.textSub,fontWeight:600,borderBottom:`1px solid ${T.border}`,whiteSpace:"nowrap"}}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {[...notas].sort((a,b)=>b.competencia?.localeCompare(a.competencia||"")||0).map(n=>(
+                              <tr key={n.id} style={{borderBottom:`1px solid ${T.border}`}}>
+                                <td style={{padding:"8px 10px"}}><span style={chip(meiCor(n.meiId))}>{meiNome(n.meiId)}</span></td>
+                                <td style={{padding:"8px 10px",color:T.textSub,whiteSpace:"nowrap"}}>{n.competencia?.replace("-","/")||"—"}</td>
+                                <td style={{padding:"8px 10px",color:T.purple,fontWeight:600}}>{n.numeroNF||"—"}</td>
+                                <td style={{padding:"8px 10px",color:T.green,fontWeight:700,whiteSpace:"nowrap"}}>{fmt(n.valor)}</td>
+                                <td style={{padding:"8px 10px",color:T.text}}>{n.prestador||"—"}</td>
+                                <td style={{padding:"8px 10px",color:T.text}}>{n.tomador||"—"}</td>
+                                <td style={{padding:"8px 10px",color:T.textSub,maxWidth:"160px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{n.descricao||"—"}</td>
+                                <td style={{padding:"8px 10px"}}><button style={remB} onClick={()=>{if(confirm("Remover esta NF?"))removeNF(n.id);}}>✕</button></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── VISÃO MENSAL ── */}
+              {meiTab==="mensal"&&(
+                <div>
+                  <div style={{...card({marginBottom:"14px"}),padding:"12px 16px"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:"12px",flexWrap:"wrap"}}>
+                      <label style={{fontSize:"13px",fontWeight:600,color:T.text}}>Competência:</label>
+                      <input type="month" style={{...inpS,width:"160px"}} value={meiVisualMonth} onChange={e=>setMeiVisualMonth(e.target.value)}/>
+                    </div>
+                  </div>
+
+                  {/* Gráfico barras por MEI */}
+                  <div style={card()}>
+                    <p style={{fontSize:"13px",fontWeight:700,color:T.text,marginBottom:"12px"}}>📊 Faturamento — {meiVisualMonth.replace("-","/")} </p>
+                    <div style={{display:"flex",gap:"16px",alignItems:"flex-end",height:"160px",marginBottom:"8px",padding:"0 8px"}}>
+                      {meis.map(m=>{
+                        const fat=faturadoMes(m.id,meiVisualMonth);
+                        const limMes=m.limiteAnual/12;
+                        const pct=Math.min(100,(fat/limMes)*100);
+                        return(
+                          <div key={m.id} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:"4px"}}>
+                            <span style={{fontSize:"12px",fontWeight:700,color:pct>90?T.red:m.cor}}>{fmt(fat)}</span>
+                            <div style={{width:"100%",height:"120px",background:T.surfaceAlt,borderRadius:"6px 6px 0 0",border:`1px solid ${T.border}`,display:"flex",alignItems:"flex-end"}}>
+                              <div style={{width:"100%",height:`${pct}%`,background:pct>90?T.red:pct>70?T.amber:m.cor,borderRadius:"4px 4px 0 0",minHeight:pct>0?"4px":"0",transition:"height 0.4s"}}/>
+                            </div>
+                            <span style={chip(m.cor)}>{m.nome}</span>
+                            <span style={{fontSize:"10px",color:T.textSub}}>{pct.toFixed(1)}% do limite</span>
+                          </div>
+                        );
+                      })}
+                      {/* Linha limite */}
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:"6px",marginTop:"4px"}}>
+                      <div style={{width:"20px",height:"2px",background:T.amber,borderStyle:"dashed"}}/>
+                      <span style={{fontSize:"11px",color:T.amber}}>Limite mensal ideal: {fmt(LIMITE_MEI_MENSAL)}/mês</span>
+                    </div>
+                  </div>
+
+                  {/* Tabela mês a mês */}
+                  <div style={card()}>
+                    <p style={{fontSize:"13px",fontWeight:700,color:T.text,marginBottom:"12px"}}>📅 Faturamento mês a mês — {CY}</p>
+                    <div style={{overflowX:"auto"}}>
+                      <table style={{width:"100%",borderCollapse:"collapse",fontSize:"12px"}}>
+                        <thead>
+                          <tr style={{background:T.surfaceAlt}}>
+                            <th style={{padding:"8px 10px",textAlign:"left",color:T.textSub,fontWeight:600,borderBottom:`1px solid ${T.border}`}}>Mês</th>
+                            {meis.map(m=><th key={m.id} style={{padding:"8px 10px",textAlign:"right",color:m.cor,fontWeight:600,borderBottom:`1px solid ${T.border}`}}>{m.nome}</th>)}
+                            <th style={{padding:"8px 10px",textAlign:"right",color:T.textSub,fontWeight:600,borderBottom:`1px solid ${T.border}`}}>Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Array.from({length:12},(_,i)=>{
+                            const comp=CY_STR+"-"+String(i+1).padStart(2,"0");
+                            const vals=meis.map(m=>faturadoMes(m.id,comp));
+                            const total=vals.reduce((s,v)=>s+v,0);
+                            const isSelected=comp===meiVisualMonth;
+                            return(
+                              <tr key={i} style={{background:isSelected?T.purpleLight:"transparent",cursor:"pointer"}} onClick={()=>setMeiVisualMonth(comp)}>
+                                <td style={{padding:"8px 10px",fontWeight:isSelected?700:400,color:isSelected?T.purple:T.text}}>{MONTHS[i]}</td>
+                                {vals.map((v,j)=>{
+                                  const lim=meis[j].limiteAnual/12;
+                                  const pct=lim>0?(v/lim)*100:0;
+                                  return(
+                                    <td key={j} style={{padding:"8px 10px",textAlign:"right"}}>
+                                      {v>0?(
+                                        <div>
+                                          <span style={{color:pct>100?T.red:meis[j].cor,fontWeight:600}}>{fmt(v)}</span>
+                                          <div style={{height:3,background:T.surfaceAlt,borderRadius:2,marginTop:"2px",minWidth:"60px"}}>
+                                            <div style={{height:3,width:`${Math.min(100,pct)}%`,background:pct>100?T.red:pct>80?T.amber:meis[j].cor,borderRadius:2}}/>
+                                          </div>
+                                        </div>
+                                      ):"—"}
+                                    </td>
+                                  );
+                                })}
+                                <td style={{padding:"8px 10px",textAlign:"right",fontWeight:total>0?700:400,color:total>0?T.text:T.textMuted}}>{total>0?fmt(total):"—"}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                        <tfoot>
+                          <tr style={{borderTop:`2px solid ${T.borderStrong}`,background:T.surfaceAlt}}>
+                            <td style={{padding:"8px 10px",fontWeight:700}}>TOTAL {CY}</td>
+                            {meis.map(m=><td key={m.id} style={{padding:"8px 10px",textAlign:"right",color:m.cor,fontWeight:700}}>{fmt(faturadoAno(m.id))}</td>)}
+                            <td style={{padding:"8px 10px",textAlign:"right",fontWeight:700,color:T.text}}>{fmt(meis.reduce((s,m)=>s+faturadoAno(m.id),0))}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* NFs do mês selecionado */}
+                  {meis.some(m=>notasMes(m.id,meiVisualMonth).length>0)&&(
+                    <div style={card()}>
+                      <p style={{fontSize:"13px",fontWeight:700,color:T.text,marginBottom:"12px"}}>🧾 NFs de {meiVisualMonth.replace("-","/")} </p>
+                      {meis.map(m=>{
+                        const nfs=notasMes(m.id,meiVisualMonth);
+                        if(nfs.length===0)return null;
+                        return(
+                          <div key={m.id} style={{marginBottom:"12px"}}>
+                            <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"6px"}}>
+                              <span style={chip(m.cor)}>{m.nome}</span>
+                              <span style={{fontSize:"12px",color:T.textSub}}>{nfs.length} NF(s) • Total: <strong style={{color:m.cor}}>{fmt(nfs.reduce((s,n)=>s+n.valor,0))}</strong></span>
+                            </div>
+                            {nfs.map(n=>(
+                              <div key={n.id} style={{...itemRow,marginLeft:"8px"}}>
+                                <div>
+                                  <div style={{display:"flex",gap:"6px",alignItems:"center"}}>
+                                    {n.numeroNF&&<span style={{...chip(T.purple),fontSize:"10px"}}>NF {n.numeroNF}</span>}
+                                    <span style={{fontSize:"13px",fontWeight:500,color:T.text}}>{n.tomador||n.descricao||"—"}</span>
+                                  </div>
+                                  {n.descricao&&<p style={{fontSize:"11px",color:T.textSub,margin:"2px 0 0"}}>{n.descricao}</p>}
+                                </div>
+                                <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+                                  <span style={{color:m.cor,fontWeight:700,fontSize:"14px"}}>{fmt(n.valor)}</span>
+                                  <button style={remB} onClick={()=>removeNF(n.id)}>✕</button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── VISÃO ANUAL ── */}
+              {meiTab==="anual"&&(
+                <div>
+                  {/* Alert projeção */}
+                  {meis.some(m=>projecaoAnual(m.id)>(m.limiteAnual||LIMITE_MEI_ANUAL))&&(
+                    <div style={{background:T.redLight,border:"1px solid #FECACA",borderRadius:"10px",padding:"12px 16px",marginBottom:"14px",display:"flex",alignItems:"center",gap:"12px"}}>
+                      <span style={{fontSize:"22px"}}>🚨</span>
+                      <div>
+                        <p style={{color:T.red,fontWeight:700,fontSize:"13px",margin:0}}>Projeção acima do limite MEI!</p>
+                        <p style={{color:"#B91C1C",fontSize:"12px",margin:"2px 0 0"}}>
+                          {meis.filter(m=>projecaoAnual(m.id)>(m.limiteAnual||LIMITE_MEI_ANUAL)).map(m=>`${m.nome}: projeção ${fmt(projecaoAnual(m.id))} (limite ${fmt(m.limiteAnual||LIMITE_MEI_ANUAL)})`).join(" • ")}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Cards por MEI */}
+                  <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(2,1fr)",gap:"14px",marginBottom:"14px"}}>
+                    {meis.map(m=>{
+                      const fatAno=faturadoAno(m.id);
+                      const limAnual=m.limiteAnual||LIMITE_MEI_ANUAL;
+                      const proj=projecaoAnual(m.id);
+                      const restante=restanteLimite(m.id);
+                      const mediaSeg=mediaMensalSegura(m.id);
+                      const pctAnual=(fatAno/limAnual)*100;
+                      const projAcima=proj>limAnual;
+                      return(
+                        <div key={m.id} style={{...card({marginBottom:0}),border:`1px solid ${m.cor}30`}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px"}}>
+                            <span style={{...chip(m.cor),fontSize:"13px"}}>{m.nome}</span>
+                            {projAcima&&<span style={{...chip(T.red),fontSize:"10px"}}>⚠️ Projeção acima</span>}
+                          </div>
+                          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",marginBottom:"12px"}}>
+                            <div style={{background:T.surfaceAlt,borderRadius:"8px",padding:"10px"}}>
+                              <p style={{fontSize:"10px",color:T.textSub,margin:"0 0 3px",textTransform:"uppercase",letterSpacing:"0.06em"}}>Faturado</p>
+                              <p style={{fontSize:"18px",fontWeight:700,color:m.cor,margin:0}}>{fmt(fatAno)}</p>
+                            </div>
+                            <div style={{background:T.surfaceAlt,borderRadius:"8px",padding:"10px"}}>
+                              <p style={{fontSize:"10px",color:T.textSub,margin:"0 0 3px",textTransform:"uppercase",letterSpacing:"0.06em"}}>Restante</p>
+                              <p style={{fontSize:"18px",fontWeight:700,color:restante>0?T.green:T.red,margin:0}}>{fmt(restante)}</p>
+                            </div>
+                            <div style={{background:T.surfaceAlt,borderRadius:"8px",padding:"10px"}}>
+                              <p style={{fontSize:"10px",color:T.textSub,margin:"0 0 3px",textTransform:"uppercase",letterSpacing:"0.06em"}}>Projeção Anual</p>
+                              <p style={{fontSize:"16px",fontWeight:700,color:projAcima?T.red:T.text,margin:0}}>{proj>0?fmt(proj):"—"}</p>
+                            </div>
+                            <div style={{background:T.surfaceAlt,borderRadius:"8px",padding:"10px"}}>
+                              <p style={{fontSize:"10px",color:T.textSub,margin:"0 0 3px",textTransform:"uppercase",letterSpacing:"0.06em"}}>Média Segura/mês</p>
+                              <p style={{fontSize:"16px",fontWeight:700,color:T.green,margin:0}}>{mediaSeg>0?fmt(mediaSeg):"—"}</p>
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{display:"flex",justifyContent:"space-between",fontSize:"12px",marginBottom:"4px"}}>
+                              <span style={{color:T.textSub}}>{pctAnual.toFixed(1)}% do limite anual</span>
+                              <span style={{color:T.textSub}}>Limite: {fmt(limAnual)}</span>
+                            </div>
+                            <div style={{height:10,background:T.surfaceAlt,borderRadius:6,border:`1px solid ${T.border}`}}>
+                              <div style={{height:10,width:`${Math.min(100,pctAnual)}%`,background:pctAnual>90?T.red:pctAnual>70?T.amber:m.cor,borderRadius:6,transition:"width 0.5s"}}/>
+                            </div>
+                            {proj>0&&proj>fatAno&&(
+                              <div style={{marginTop:"3px",fontSize:"10px",color:projAcima?T.red:T.amber}}>
+                                📈 Projeção: {((proj/limAnual)*100).toFixed(1)}% do limite
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Card família consolidado */}
+                  {meis.length>1&&(()=>{
+                    const totalFam=meis.reduce((s,m)=>s+faturadoAno(m.id),0);
+                    const limFam=meis.reduce((s,m)=>s+(m.limiteAnual||LIMITE_MEI_ANUAL),0);
+                    const pctFam=(totalFam/limFam)*100;
+                    return(
+                      <div style={{...card({marginBottom:"14px"}),background:"linear-gradient(135deg,#F0FDF4,#DCFCE7)",border:"1px solid #BBF7D0"}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px"}}>
+                          <p style={{fontSize:"14px",fontWeight:700,color:T.green,margin:0}}>🏠 Consolidado Família</p>
+                          <span style={{fontSize:"13px",color:T.textSub}}>Limite total: {fmt(limFam)}</span>
+                        </div>
+                        <p style={{fontSize:"28px",fontWeight:700,color:T.green,margin:"0 0 8px"}}>{fmt(totalFam)}</p>
+                        <div style={{height:12,background:"rgba(255,255,255,0.6)",borderRadius:6,border:"1px solid #BBF7D0",overflow:"hidden"}}>
+                          {meis.map((m,i)=>{
+                            const w=(faturadoAno(m.id)/limFam)*100;
+                            const left=meis.slice(0,i).reduce((s,mm)=>(s+faturadoAno(mm.id)/limFam)*100,0);
+                            return w>0?<div key={m.id} style={{position:"absolute",height:"12px",width:`${w}%`,left:`${left}%`,background:m.cor,opacity:0.85}}/>:null;
+                          })}
+                          <div style={{position:"relative",height:"12px",display:"flex"}}>
+                            {meis.map(m=>{
+                              const w=(faturadoAno(m.id)/limFam)*100;
+                              return w>0?<div key={m.id} style={{height:"12px",width:`${w}%`,background:m.cor,opacity:0.9}}/>:null;
+                            })}
+                          </div>
+                        </div>
+                        <div style={{display:"flex",gap:"12px",marginTop:"6px",flexWrap:"wrap"}}>
+                          {meis.map(m=><span key={m.id} style={{display:"flex",alignItems:"center",gap:"4px",fontSize:"11px",color:T.textSub}}><span style={{width:8,height:8,borderRadius:2,background:m.cor,display:"inline-block"}}/>{m.nome}: {fmt(faturadoAno(m.id))}</span>)}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Gráfico linha comparativo */}
+                  <div style={card()}>
+                    <p style={{fontSize:"13px",fontWeight:700,color:T.text,marginBottom:"12px"}}>📈 Evolução Comparativa — {CY}</p>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={mesesChart} margin={{top:5,right:5,bottom:0,left:0}}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={T.border}/>
+                        <XAxis dataKey="name" tick={{fill:T.textMuted,fontSize:10}} axisLine={false} tickLine={false}/>
+                        <YAxis tickFormatter={fmtK} tick={{fill:T.textMuted,fontSize:10}} axisLine={false} tickLine={false}/>
+                        <Tooltip content={<CT/>}/>
+                        {meis.map(m=><Bar key={m.id} dataKey={m.nome} fill={m.cor} radius={[3,3,0,0]}/>)}
+                        <ReferenceLine y={LIMITE_MEI_MENSAL} stroke={T.amber} strokeDasharray="4 4" label={{value:`Limite ${fmtK(LIMITE_MEI_MENSAL)}`,fill:T.amber,fontSize:10,position:"right"}}/>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+
+              {/* ── CONFIG ── */}
+              {meiTab==="config"&&(
+                <div>
+                  <div style={card()}>
+                    <p style={{fontSize:"13px",fontWeight:700,color:T.text,marginBottom:"14px"}}>⚙️ MEIs Cadastrados</p>
+                    {meis.map((m,i)=>(
+                      <div key={m.id} style={{...itemRow,flexDirection:"column",alignItems:"stretch",marginBottom:"10px"}}>
+                        {editMei?.id===m.id?(
+                          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:"10px"}}>
+                            <div><label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Nome</label><input style={inpS} value={editMei.nome} onChange={e=>setEditMei(em=>({...em,nome:e.target.value}))}/></div>
+                            <div><label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Cor</label>
+                              <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
+                                <input type="color" value={editMei.cor} onChange={e=>setEditMei(em=>({...em,cor:e.target.value}))} style={{width:"36px",height:"36px",borderRadius:"8px",border:`1px solid ${T.border}`,cursor:"pointer",padding:"2px"}}/>
+                                <span style={{fontSize:"12px",color:T.textSub}}>{editMei.cor}</span>
+                              </div>
+                            </div>
+                            <div><label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Limite Anual (R$)</label><input type="number" style={inpS} value={editMei.limiteAnual} onChange={e=>setEditMei(em=>({...em,limiteAnual:parseFloat(e.target.value)||0}))}/></div>
+                            <div><label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Tipo</label>
+                              <select style={selS} value={editMei.tipo} onChange={e=>setEditMei(em=>({...em,tipo:e.target.value}))}>
+                                <option value="servicos">Serviços</option>
+                                <option value="comercio">Comércio</option>
+                                <option value="ambos">Serviços + Comércio</option>
+                              </select>
+                            </div>
+                            <div style={{gridColumn:"span 2",display:"flex",gap:"8px",alignItems:"flex-end",paddingBottom:"2px"}}>
+                              <button style={btnP(T.green)} onClick={()=>{setMeiData(d=>({...d,meis:d.meis.map(mm=>mm.id===editMei.id?editMei:mm)}));setEditMei(null);showToast("MEI atualizado!");}}>✅ Salvar</button>
+                              <button style={btnG} onClick={()=>setEditMei(null)}>Cancelar</button>
+                            </div>
+                          </div>
+                        ):(
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                            <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
+                              <div style={{width:"14px",height:"14px",borderRadius:"50%",background:m.cor,flexShrink:0}}/>
+                              <div>
+                                <p style={{fontSize:"14px",fontWeight:600,color:T.text,margin:0}}>{m.nome}</p>
+                                <p style={{fontSize:"12px",color:T.textSub,margin:0}}>Limite: {fmt(m.limiteAnual||LIMITE_MEI_ANUAL)} • {m.tipo==="servicos"?"Serviços":m.tipo==="comercio"?"Comércio":"Serv+Com"}</p>
+                              </div>
+                            </div>
+                            <button style={editB} onClick={()=>setEditMei({...m})}>✏️ Editar</button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    <div style={{marginTop:"14px",paddingTop:"14px",borderTop:`1px solid ${T.border}`}}>
+                      <p style={{fontSize:"12px",fontWeight:600,color:T.textSub,marginBottom:"10px"}}>➕ Adicionar novo MEI</p>
+                      <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:"10px"}}>
+                        <div><label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Nome</label><input style={inpS} placeholder="Ex: Maria" id="meiNomeNew"/></div>
+                        <div><label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Cor</label><input type="color" defaultValue="#7C3AED" id="meiCorNew" style={{width:"36px",height:"36px",borderRadius:"8px",border:`1px solid ${T.border}`,cursor:"pointer",padding:"2px"}}/></div>
+                        <div><label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Limite Anual</label><input type="number" style={inpS} placeholder="81000" id="meiLimNew"/></div>
+                      </div>
+                      <button style={{...btnP(T.purple),marginTop:"10px"}} onClick={()=>{
+                        const nome=document.getElementById("meiNomeNew")?.value;
+                        const cor=document.getElementById("meiCorNew")?.value||"#7C3AED";
+                        const lim=parseFloat(document.getElementById("meiLimNew")?.value)||81000;
+                        if(!nome){showToast("Informe o nome","error");return;}
+                        setMeiData(d=>({...d,meis:[...d.meis,{id:uid(),nome,cor,limiteAnual:lim,tipo:"servicos"}]}));
+                        showToast("MEI adicionado!");
+                      }}>+ Adicionar MEI</button>
+                    </div>
+                  </div>
+
+                  {/* DAS-MEI info card */}
+                  <div style={{...card({marginBottom:0}),background:T.blueLight,border:"1px solid #BAE6FD"}}>
+                    <p style={{fontSize:"14px",fontWeight:700,color:T.blue,marginBottom:"12px"}}>💡 DAS-MEI 2026 — Valores de Referência</p>
+                    <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:"10px"}}>
+                      {[
+                        {label:"Limite Anual MEI",valor:"R$ 81.000,00",desc:"Faturamento máximo permitido"},
+                        {label:"Limite Mensal Ideal",valor:"R$ 6.750,00",desc:"81.000 ÷ 12 meses"},
+                        {label:"INSS (5% salário mínimo)",valor:"R$ 75,90",desc:"Contribuição previdenciária"},
+                        {label:"ISS — Serviços",valor:"R$ 5,00",desc:"Imposto Sobre Serviços"},
+                        {label:"ICMS — Comércio",valor:"R$ 1,00",desc:"Imposto sobre circulação"},
+                        {label:"DAS Total (Serviços)",valor:"R$ 80,90",desc:"INSS + ISS"},
+                      ].map(item=>(
+                        <div key={item.label} style={{background:T.surface,borderRadius:"8px",padding:"12px",border:`1px solid ${T.border}`}}>
+                          <p style={{fontSize:"11px",color:T.textSub,margin:"0 0 4px"}}>{item.label}</p>
+                          <p style={{fontSize:"16px",fontWeight:700,color:T.blue,margin:"0 0 2px"}}>{item.valor}</p>
+                          <p style={{fontSize:"10px",color:T.textMuted,margin:0}}>{item.desc}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <p style={{fontSize:"11px",color:"#0369A1",marginTop:"10px",fontStyle:"italic"}}>* Valores baseados no salário mínimo de R$ 1.518,00. Verifique os valores atualizados na Receita Federal.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* ── SINCRONIZAR ── */}
         {activeSection==="sincronizar"&&(
           <div style={{maxWidth:"680px"}}>
@@ -1610,7 +2140,7 @@ Cancelar = Dar baixa só nesta parcela`);
       {/* MOBILE BOTTOM NAV */}
       {isMobile&&(
         <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:200,background:T.surface,borderTop:`1px solid ${T.border}`,display:"flex",justifyContent:"space-around",padding:"8px 0 12px",boxShadow:"0 -2px 10px rgba(0,0,0,0.08)"}}>
-          {[{key:"dashboard",icon:"📊",label:"Início"},{key:"lancamentos",icon:"✏️",label:"Lançar"},{key:"cartoes",icon:"💳",label:"Cartões"},{key:"cadastros",icon:"🗂️",label:"Cadastros"},{key:"sincronizar",icon:"🔄",label:"Sync"}].map(n=>(
+          {[{key:"dashboard",icon:"📊",label:"Início"},{key:"lancamentos",icon:"✏️",label:"Lançar"},{key:"cartoes",icon:"💳",label:"Cartões"},{key:"mei",icon:"🏢",label:"MEI"},{key:"sincronizar",icon:"🔄",label:"Sync"}].map(n=>(
             <div key={n.key} onClick={()=>setActiveSection(n.key)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"3px",cursor:"pointer",minWidth:"56px"}}>
               <span style={{fontSize:"20px"}}>{n.icon}</span>
               <span style={{fontSize:"9px",fontWeight:600,color:activeSection===n.key?T.purple:T.textMuted}}>{n.label}</span>
