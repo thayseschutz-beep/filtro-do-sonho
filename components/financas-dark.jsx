@@ -459,6 +459,19 @@ export default function App(){
   const faturasAbertas=faturasMes-cartoes.reduce((s,c)=>s+(isPago(c.id,CY,currentMonth)?getFat(c.id,CY,currentMonth):0),0);
   const saldoReal=saldo-faturasAbertas;
   const recConfirmado=sumArr(monthData.receitas.filter(x=>x.recebido));
+  // ── VISÃO ANUAL ───────────────────────────────────────────────
+  const anoRecTotal = safeData.reduce((s,m)=>s+sumArr(m.receitas),0);
+  const anoDespTotal = safeData.reduce((s,m)=>s+sumArr(m.despesas),0);
+  const anoInvTotal = safeData.reduce((s,m)=>s+sumArr(m.investimentos),0);
+  const anoEmpTotal = safeData.reduce((s,m)=>s+sumArr(m.emprestimos),0);
+  const anoCartTotal = yrMs.reduce((s,i)=>s+cartoes.reduce((ss,c)=>ss+getFat(c.id,CY,i),0),0);
+  const anoCartAberto = yrMs.reduce((s,i)=>s+cartoes.reduce((ss,c)=>ss+(!isPago(c.id,CY,i)?getFat(c.id,CY,i):0),0),0);
+  const anoSaldo = anoRecTotal - anoDespTotal - anoInvTotal - anoEmpTotal;
+  const anoSaldoReal = anoSaldo - anoCartAberto;
+  const anoRecConf = safeData.reduce((s,m)=>s+sumArr(m.receitas.filter(x=>x.recebido)),0);
+  const anoDespConf = safeData.reduce((s,m)=>s+sumArr(m.despesas.filter(x=>x.pago)),0);
+  // meses com algum dado no ano
+  const mesesComDadosAno = safeData.filter(m=>sumArr(m.receitas)+sumArr(m.despesas)+sumArr(m.investimentos)+sumArr(m.emprestimos)>0).length;
   // Parcelados: provisão dos próximos meses
   const proximosParcelados=yrMs.filter(m=>m>currentMonth).map(m=>({
     month:m,
@@ -827,9 +840,11 @@ Cancelar = Dar baixa só nesta parcela`);
                 {["mes","ano"].map(v=><button key={v} style={toggleB(view===v)} onClick={()=>setView(v)}>{v==="mes"?"Mês":"Ano"}</button>)}
               </div>}
               <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
-                <button style={{...btnG,padding:"6px 10px"}} onClick={()=>setCurrentMonth(m=>Math.max(0,m-1))}>‹</button>
-                <span style={{fontSize:"14px",fontWeight:600,color:T.text,minWidth:"120px",textAlign:"center"}}>{MONTHS[currentMonth]}</span>
-                <button style={{...btnG,padding:"6px 10px"}} onClick={()=>setCurrentMonth(m=>Math.min(11,m+1))}>›</button>
+                {view==="mes"&&<button style={{...btnG,padding:"6px 10px"}} onClick={()=>setCurrentMonth(m=>Math.max(0,m-1))}>‹</button>}
+                <span style={{fontSize:"14px",fontWeight:600,color:T.text,minWidth:"130px",textAlign:"center"}}>
+                  {view==="mes"?`${MONTHS[currentMonth]} ${CY}`:`Ano ${CY}`}
+                </span>
+                {view==="mes"&&<button style={{...btnG,padding:"6px 10px"}} onClick={()=>setCurrentMonth(m=>Math.min(11,m+1))}>›</button>}
               </div>
             </div>
           )}
@@ -838,10 +853,123 @@ Cancelar = Dar baixa só nesta parcela`);
         {/* ── DASHBOARD ── */}
         {activeSection==="dashboard"&&(
           <div>
+            {/* Alert sempre visível */}
             {totalAtrasado>0&&<div style={{background:T.redLight,border:"1px solid #FECACA",borderRadius:"10px",padding:"12px 16px",marginBottom:"16px",display:"flex",alignItems:"center",gap:"12px"}}>
               <span style={{fontSize:"20px"}}>⚠️</span>
               <div><p style={{color:T.red,fontWeight:700,fontSize:"13px",margin:0}}>Faturas em atraso!</p><p style={{color:"#B91C1C",fontSize:"12px",margin:"2px 0 0"}}>Total não pago de meses anteriores: <strong>{fmt(totalAtrasado)}</strong></p></div>
             </div>}
+
+            {/* ── VISÃO ANO ── */}
+            {view==="ano"&&(
+              <div>
+                {/* Métricas anuais */}
+                <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(2,1fr)":"repeat(4,1fr)",gap:"12px",marginBottom:"12px"}}>
+                  {[
+                    {l:"RECEITAS ANUAIS",v:anoRecTotal,c:T.green,bg:T.greenLight,i:"↑",conf:anoRecConf,confLabel:"recebido"},
+                    {l:"DESPESAS ANUAIS",v:anoDespTotal,c:T.red,bg:T.redLight,i:"↓",conf:anoDespConf,confLabel:"pago"},
+                    {l:"INVESTIMENTOS",v:anoInvTotal,c:T.blue,bg:T.blueLight,i:"◆"},
+                    {l:"FATURAS CARTÕES",v:anoCartTotal,c:T.amber,bg:T.amberLight,i:"💳",sub:anoCartAberto>0?`${fmt(anoCartAberto)} em aberto`:"✓ Em dia"},
+                  ].map(m=>(
+                    <div key={m.l} style={{...card({marginBottom:0}),border:`1px solid ${m.c}30`}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"8px"}}>
+                        <p style={{fontSize:"10px",fontWeight:700,color:T.textSub,textTransform:"uppercase",letterSpacing:"0.06em",margin:0}}>{m.l}</p>
+                        <span style={{background:m.bg,color:m.c,borderRadius:"8px",padding:"4px 8px",fontSize:"14px"}}>{m.i}</span>
+                      </div>
+                      <p style={{fontSize:"22px",fontWeight:700,color:m.c,margin:"0 0 4px"}}>{fmt(m.v)}</p>
+                      {m.conf!==undefined&&<div style={{marginTop:"4px"}}>
+                        <div style={{height:4,background:T.surfaceAlt,borderRadius:4,border:`1px solid ${T.border}`,marginBottom:"3px"}}>
+                          <div style={{height:4,width:m.v>0?`${Math.min(100,(m.conf/m.v)*100)}%`:"0%",background:m.c,borderRadius:4}}/>
+                        </div>
+                        <span style={{fontSize:"10px",color:T.textSub}}>{m.v>0&&m.conf===m.v?`✓ 100% ${m.confLabel}`:`${fmt(m.conf)} ${m.confLabel} de ${fmt(m.v)}`}</span>
+                      </div>}
+                      {m.sub&&<span style={{fontSize:"10px",fontWeight:600,color:m.c,background:m.bg,padding:"2px 8px",borderRadius:"20px",display:"inline-block",marginTop:"4px"}}>{m.sub}</span>}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Empréstimos + Saldos anuais */}
+                {anoEmpTotal>0&&<div style={{...card({marginBottom:"12px"}),borderLeft:`4px solid ${T.amber}`}}>
+                  <p style={{fontSize:"11px",fontWeight:600,color:T.textSub,textTransform:"uppercase",letterSpacing:"0.06em",margin:"0 0 4px"}}>EMPRÉSTIMOS ANUAIS</p>
+                  <p style={{fontSize:"20px",fontWeight:700,color:T.amber,margin:0}}>{fmt(anoEmpTotal)}</p>
+                </div>}
+
+                <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:"12px",marginBottom:"12px"}}>
+                  <div style={{...card({marginBottom:0}),borderLeft:`4px solid ${T.purple}`}}>
+                    <p style={{fontSize:"11px",fontWeight:600,color:T.textSub,textTransform:"uppercase",letterSpacing:"0.06em",margin:"0 0 4px"}}>SALDO ORÇAMENTO {CY}</p>
+                    <p style={{fontSize:"26px",fontWeight:700,color:anoSaldo>=0?T.purple:T.red,margin:"0 0 4px"}}>{fmt(anoSaldo)}</p>
+                    <p style={{fontSize:"12px",color:T.textSub,margin:0}}>Rec − Desp − Invest − Emp</p>
+                  </div>
+                  <div style={{...card({marginBottom:0}),borderLeft:`4px solid ${anoSaldoReal>=0?T.green:T.red}`}}>
+                    <p style={{fontSize:"11px",fontWeight:600,color:T.textSub,textTransform:"uppercase",letterSpacing:"0.06em",margin:"0 0 4px"}}>SALDO REAL {CY}</p>
+                    <p style={{fontSize:"26px",fontWeight:700,color:anoSaldoReal>=0?T.green:T.red,margin:"0 0 4px"}}>{fmt(anoSaldoReal)}</p>
+                    <p style={{fontSize:"12px",color:T.textSub,margin:0}}>{anoCartAberto>0?`Inclui ${fmt(anoCartAberto)} faturas em aberto`:"Faturas em dia ✓"}</p>
+                  </div>
+                </div>
+
+                {/* Info meses com dados */}
+                <div style={{...card({marginBottom:"12px"}),background:T.surfaceAlt,padding:"12px 16px"}}>
+                  <div style={{display:"flex",gap:"20px",flexWrap:"wrap",alignItems:"center"}}>
+                    <span style={{fontSize:"13px",color:T.textSub}}>📅 Meses com lançamentos: <strong style={{color:T.text}}>{mesesComDadosAno} de 12</strong></span>
+                    <span style={{fontSize:"13px",color:T.textSub}}>📈 Média mensal receitas: <strong style={{color:T.green}}>{mesesComDadosAno>0?fmt(anoRecTotal/mesesComDadosAno):"—"}</strong></span>
+                    <span style={{fontSize:"13px",color:T.textSub}}>📉 Média mensal despesas: <strong style={{color:T.red}}>{mesesComDadosAno>0?fmt(anoDespTotal/mesesComDadosAno):"—"}</strong></span>
+                  </div>
+                </div>
+
+                {/* Gráfico anual */}
+                <div style={card()}>
+                  <p style={{fontSize:"13px",fontWeight:600,color:T.text,marginBottom:"14px"}}>📈 Evolução Anual {CY}</p>
+                  <ResponsiveContainer width="100%" height={210}>
+                    <AreaChart data={chartData} margin={{top:5,right:5,bottom:0,left:0}}>
+                      <defs>
+                        <linearGradient id="gRa" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={T.green} stopOpacity={0.15}/><stop offset="95%" stopColor={T.green} stopOpacity={0}/></linearGradient>
+                        <linearGradient id="gDa" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={T.red} stopOpacity={0.15}/><stop offset="95%" stopColor={T.red} stopOpacity={0}/></linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke={T.border}/>
+                      <XAxis dataKey="name" tick={{fill:T.textMuted,fontSize:10}} axisLine={false} tickLine={false}/>
+                      <YAxis tickFormatter={fmtK} tick={{fill:T.textMuted,fontSize:10}} axisLine={false} tickLine={false}/>
+                      <Tooltip content={<CT/>}/>
+                      <Area type="monotone" dataKey="Receitas" stroke={T.green} strokeWidth={2} fill="url(#gRa)"/>
+                      <Area type="monotone" dataKey="Despesas" stroke={T.red} strokeWidth={2} fill="url(#gDa)"/>
+                      <Area type="monotone" dataKey="Cartões" stroke={T.amber} strokeWidth={1.5} fill="none" strokeDasharray="4 2"/>
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Resumo mensal compacto */}
+                <div style={card()}>
+                  <p style={{fontSize:"13px",fontWeight:600,color:T.text,marginBottom:"12px"}}>📅 Resumo Mensal — {CY}</p>
+                  <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(2,1fr)":"repeat(4,1fr)",gap:"8px"}}>
+                    {MONTHS.map((m,i)=>{
+                      const r=sumArr(safeData[i].receitas),d=sumArr(safeData[i].despesas),inv=sumArr(safeData[i].investimentos),emp=sumArr(safeData[i].emprestimos);
+                      const cart=cartoes.reduce((s,c)=>s+getFat(c.id,CY,i),0);
+                      const s=r-d-inv-emp-cartoes.reduce((s2,c)=>s2+(!isPago(c.id,CY,i)?getFat(c.id,CY,i):0),0);
+                      const temDados=r>0||d>0||inv>0||emp>0;
+                      return(
+                        <div key={i} style={{background:temDados?T.surface:T.surfaceAlt,border:temDados?`1px solid ${T.borderStrong}`:`1px solid ${T.border}`,borderRadius:"10px",padding:"10px",cursor:"pointer",opacity:temDados?1:0.5,transition:"all 0.15s"}}
+                          onClick={()=>{setCurrentMonth(i);setView("mes");}}>
+                          <p style={{fontSize:"11px",fontWeight:700,color:temDados?T.text:T.textMuted,marginBottom:"4px"}}>{m}</p>
+                          {temDados?(
+                            <div style={{fontSize:"10px",display:"flex",flexDirection:"column",gap:"2px"}}>
+                              {r>0&&<div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:T.textMuted}}>Rec</span><span style={{color:T.green,fontWeight:500}}>{fmtK(r)}</span></div>}
+                              {d>0&&<div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:T.textMuted}}>Desp</span><span style={{color:T.red,fontWeight:500}}>{fmtK(d)}</span></div>}
+                              {cart>0&&<div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:T.textMuted}}>Cart</span><span style={{color:T.amber,fontWeight:500}}>{fmtK(cart)}</span></div>}
+                              <div style={{display:"flex",justifyContent:"space-between",borderTop:`1px solid ${T.border}`,paddingTop:"2px",marginTop:"1px"}}>
+                                <span style={{color:T.textMuted}}>Saldo</span><span style={{color:s>=0?T.purple:T.red,fontWeight:700}}>{fmtK(s)}</span>
+                              </div>
+                            </div>
+                          ):<p style={{fontSize:"10px",color:T.textMuted,margin:0}}>Sem dados</p>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p style={{fontSize:"11px",color:T.textSub,marginTop:"8px"}}>💡 Clique em um mês para ver os detalhes.</p>
+                </div>
+              </div>
+            )}
+
+            {/* ── VISÃO MÊS ── */}
+            {view==="mes"&&(
+            <div>
 
             <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(2,1fr)":"repeat(4,1fr)",gap:"12px",marginBottom:"12px"}}>
               {[
@@ -991,6 +1119,8 @@ Cancelar = Dar baixa só nesta parcela`);
               </div>
             </div>
           </div>
+          {/* end view mes */}
+          </div>)}
         )}
 
         {/* ── LANÇAMENTOS ── */}
