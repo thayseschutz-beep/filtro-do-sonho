@@ -1118,9 +1118,9 @@ Cancelar = Dar baixa só nesta parcela`);
                 })}
               </div>
             </div>
+            </div>
+            )}
           </div>
-          {/* end view mes */}
-          </div>)}
         )}
 
         {/* ── LANÇAMENTOS ── */}
