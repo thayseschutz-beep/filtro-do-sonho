@@ -19,8 +19,8 @@ const LIMITE_MEI_MENSAL = LIMITE_MEI_ANUAL / 12; // R$ 6.750
 const DAS_MEI_2026 = { inss: 75.90, iss: 5.00, icms: 1.00, totalServicos: 80.90, totalComercio: 76.90 };
 const emptyMei = () => ({
   meis: [
-    { id:"thayse", nome:"Thayse", cor:"#7C3AED", limiteAnual:81000, tipo:"servicos", dataAbertura:"" },
-    { id:"lucas",  nome:"Lucas",  cor:"#0284C7", limiteAnual:81000, tipo:"servicos", dataAbertura:"" },
+    { id:"thayse", nome:"Thayse", cor:"#7C3AED", limiteAnual:81000, tipo:"servicos", dataAbertura:"", cnpj:"" },
+    { id:"lucas",  nome:"Lucas",  cor:"#0284C7", limiteAnual:81000, tipo:"servicos", dataAbertura:"", cnpj:"" },
   ],
   notas: []
 });
@@ -2074,6 +2074,7 @@ Cancelar = Dar baixa só nesta parcela`);
                           <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:"10px"}}>
                             <div><label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Nome</label><input style={inpS} value={editMei.nome} onChange={e=>setEditMei(em=>({...em,nome:e.target.value}))}/></div>
                             <div><label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Data de Abertura</label><input type="date" style={inpS} value={editMei.dataAbertura||""} onChange={e=>setEditMei(em=>({...em,dataAbertura:e.target.value}))}/></div>
+                            <div><label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>CNPJ</label><input style={inpS} placeholder="00.000.000/0001-00" value={editMei.cnpj||""} onChange={e=>setEditMei(em=>({...em,cnpj:e.target.value}))}/></div>
                             <div><label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Cor</label>
                               <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
                                 <input type="color" value={editMei.cor} onChange={e=>setEditMei(em=>({...em,cor:e.target.value}))} style={{width:"36px",height:"36px",borderRadius:"8px",border:`1px solid ${T.border}`,cursor:"pointer",padding:"2px"}}/>
@@ -2100,7 +2101,7 @@ Cancelar = Dar baixa só nesta parcela`);
                               <div>
                                 <p style={{fontSize:"14px",fontWeight:600,color:T.text,margin:0}}>{m.nome}</p>
                                 <p style={{fontSize:"12px",color:T.textSub,margin:0}}>
-                                Limite: {fmt(m.limiteAnual||LIMITE_MEI_ANUAL)} • {m.tipo==="servicos"?"Serviços":m.tipo==="comercio"?"Comércio":"Serv+Com"}
+                                Limite: {fmt(m.limiteAnual||LIMITE_MEI_ANUAL)} • {m.tipo==="servicos"?"Serviços":m.tipo==="comercio"?"Comércio":"Serv+Com"}{m.cnpj&&<span style={{color:T.textMuted,marginLeft:"8px"}}>• CNPJ: {m.cnpj}</span>}
                                 {m.dataAbertura&&<span style={{color:T.blue,marginLeft:"8px"}}>• Abertura: {m.dataAbertura}</span>}
                               </p>
                               {m.dataAbertura&&(()=>{
