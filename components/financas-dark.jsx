@@ -506,7 +506,8 @@ export default function App(){
   // meses com algum dado no ano
   const mesesComDadosAno = safeData.filter(m=>sumArr(m.receitas)+sumArr(m.despesas)+sumArr(m.investimentos)+sumArr(m.emprestimos)>0).length;
   // Parcelados: provisão dos próximos meses
-  const proximosParcelados=yrMs.filter(m=>m>currentMonth).map(m=>({
+  const realNowYear = new Date().getFullYear();
+  const proximosParcelados=yrMs.filter(m=>currentYear!==realNowYear?true:m>currentMonth).map(m=>({
     month:m,
     despesas:sumArr(safeData[m].despesas.filter(x=>x.parcelaGroupId||x.recorrenteGroupId)),
     emprestimos:sumArr(safeData[m].emprestimos.filter(x=>x.parcelaGroupId)),
@@ -517,7 +518,11 @@ export default function App(){
   const totalAtrasado=yrMs.slice(0,nowM).reduce((s,m)=>s+cartoes.reduce((ss,c)=>ss+(!isPago(c.id,CY,m)?getFat(c.id,CY,m):0),0),0);
   const totalAnualCartoes=yrMs.reduce((s,m)=>s+cartoes.reduce((ss,c)=>ss+getFat(c.id,CY,m),0),0);
   const totalAbertoPendente=yrMs.reduce((s,m)=>s+cartoes.reduce((ss,c)=>ss+(!isPago(c.id,CY,m)?getFat(c.id,CY,m):0),0),0);
-  const proximasFaturas=yrMs.filter(m=>m>=nowM).map(m=>({month:m,total:cartoes.reduce((s,c)=>s+getFat(c.id,CY,m),0),pago:cartoes.every(c=>getFat(c.id,CY,m)===0||isPago(c.id,CY,m))})).filter(f=>f.total>0).slice(0,5);
+  const proximasFaturas=yrMs
+    .filter(m=>currentYear!==realNowYear || m>=nowM) // ano diferente: mostra todos; ano atual: a partir de hoje
+    .map(m=>({month:m,total:cartoes.reduce((s,c)=>s+getFat(c.id,CY,m),0),pago:cartoes.every(c=>getFat(c.id,CY,m)===0||isPago(c.id,CY,m))}))
+    .filter(f=>f.total>0)
+    .slice(0,6);
   const totalGastoCartoes=usoCartoes.reduce((s,u)=>s+u.valor,0);
   const mesesComFat=new Set(Object.keys(fatMap).map(k=>k.split("_").slice(1).join("_"))).size;
   const mediaFat=mesesComFat>0?Object.values(fatMap).reduce((s,v)=>s+v,0)/mesesComFat:0;
