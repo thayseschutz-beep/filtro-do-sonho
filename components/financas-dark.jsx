@@ -19,12 +19,12 @@ const LIMITE_MEI_MENSAL = LIMITE_MEI_ANUAL / 12; // R$ 6.750
 const DAS_MEI_2026 = { inss: 75.90, iss: 5.00, icms: 1.00, totalServicos: 80.90, totalComercio: 76.90 };
 const emptyMei = () => ({
   meis: [
-    { id:"thayse", nome:"Thayse", cor:"#7C3AED", limiteAnual:81000, tipo:"servicos" },
-    { id:"lucas",  nome:"Lucas",  cor:"#0284C7", limiteAnual:81000, tipo:"servicos" },
+    { id:"thayse", nome:"Thayse", cor:"#7C3AED", limiteAnual:81000, tipo:"servicos", dataAbertura:"" },
+    { id:"lucas",  nome:"Lucas",  cor:"#0284C7", limiteAnual:81000, tipo:"servicos", dataAbertura:"" },
   ],
   notas: []
 });
-const emptyNFForm = () => ({ meiId:"", competencia:"", numeroNF:"", valor:"", prestador:"", tomador:"", descricao:"" });
+const emptyNFForm = (today="") => ({ meiId:"", competencia:"", dataEmissao:today, numeroNF:"", valor:"", prestador:"", tomador:"", descricao:"" });
 const emptyYear = () => Array.from({length:12},(_,i)=>({month:i,receitas:[],despesas:[],investimentos:[],emprestimos:[]}));
 const emptyCadastros = () => ({bancos:[],fornecedores:[],pessoas:[],catReceitas:[],catDespesas:[],catInvestimentos:[]});
 const emptyRecForm = (today) => ({data:today,desc:"",ref:"",cliente:"",valor:"",formaRec:"pix",banco:""});
@@ -322,7 +322,8 @@ export default function App(){
   const [meiData, setMeiData] = useState(emptyMei());
   const [meiTab, setMeiTab] = useState("lancamentos");
   const [meiVisualMonth, setMeiVisualMonth] = useState(new Date().toISOString().slice(0,7));
-  const [nfForm, setNfForm] = useState(emptyNFForm());
+  const [nfForm, setNfForm] = useState(()=>emptyNFForm(new Date().toISOString().split("T")[0]));
+  const [editNF, setEditNF] = useState(null);
   const [editMei, setEditMei] = useState(null);
   const [showLote, setShowLote] = useState(false);
   const [loteText, setLoteText] = useState("");
@@ -1669,7 +1670,8 @@ Cancelar = Dar baixa só nesta parcela`);
           const addNF = () => {
             const { meiId, competencia, numeroNF, valor, prestador, tomador, descricao } = nfForm;
             if(!meiId||!competencia||!valor) { showToast("Preencha MEI, competência e valor","error"); return; }
-            const novaNotaFiscal = { id:uid(), meiId, competencia, numeroNF, valor:parseFloat(valor)||0, prestador, tomador, descricao, dataCad:today };
+            const { dataEmissao } = nfForm;
+            const novaNotaFiscal = { id:uid(), meiId, competencia, dataEmissao, numeroNF, valor:parseFloat(valor)||0, prestador, tomador, descricao, dataCad:today };
             setMeiData(d=>({...d, notas:[...d.notas, novaNotaFiscal]}));
             setNfForm(emptyNFForm());
             showToast("NF registrada!");
@@ -1713,8 +1715,12 @@ Cancelar = Dar baixa só nesta parcela`);
                         </select>
                       </div>
                       <div>
-                        <label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Competência *</label>
+                        <label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Competência * <span style={{color:T.textMuted,fontSize:"10px"}}>(mês de referência)</span></label>
                         <input type="month" style={inpS} value={nfForm.competencia} onChange={e=>setNfForm(f=>({...f,competencia:e.target.value}))}/>
+                      </div>
+                      <div>
+                        <label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Data de Emissão da NF</label>
+                        <input type="date" style={inpS} value={nfForm.dataEmissao} onChange={e=>setNfForm(f=>({...f,dataEmissao:e.target.value}))}/>
                       </div>
                       <div>
                         <label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Nº da NF</label>
@@ -1788,7 +1794,7 @@ Cancelar = Dar baixa só nesta parcela`);
                         <table style={{width:"100%",borderCollapse:"collapse",fontSize:"12px"}}>
                           <thead>
                             <tr style={{background:T.surfaceAlt}}>
-                              {["MEI","Competência","Nº NF","Valor","Prestador","Tomador","Descrição",""].map(h=>(
+                              {["MEI","Competência","Emissão","Nº NF","Valor","Prestador","Tomador","Descrição",""].map(h=>(
                                 <th key={h} style={{padding:"8px 10px",textAlign:"left",color:T.textSub,fontWeight:600,borderBottom:`1px solid ${T.border}`,whiteSpace:"nowrap"}}>{h}</th>
                               ))}
                             </tr>
@@ -1798,12 +1804,18 @@ Cancelar = Dar baixa só nesta parcela`);
                               <tr key={n.id} style={{borderBottom:`1px solid ${T.border}`}}>
                                 <td style={{padding:"8px 10px"}}><span style={chip(meiCor(n.meiId))}>{meiNome(n.meiId)}</span></td>
                                 <td style={{padding:"8px 10px",color:T.textSub,whiteSpace:"nowrap"}}>{n.competencia?.replace("-","/")||"—"}</td>
+                                <td style={{padding:"8px 10px",color:T.textSub,whiteSpace:"nowrap"}}>{n.dataEmissao||"—"}</td>
                                 <td style={{padding:"8px 10px",color:T.purple,fontWeight:600}}>{n.numeroNF||"—"}</td>
                                 <td style={{padding:"8px 10px",color:T.green,fontWeight:700,whiteSpace:"nowrap"}}>{fmt(n.valor)}</td>
                                 <td style={{padding:"8px 10px",color:T.text}}>{n.prestador||"—"}</td>
                                 <td style={{padding:"8px 10px",color:T.text}}>{n.tomador||"—"}</td>
-                                <td style={{padding:"8px 10px",color:T.textSub,maxWidth:"160px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{n.descricao||"—"}</td>
-                                <td style={{padding:"8px 10px"}}><button style={remB} onClick={()=>{if(confirm("Remover esta NF?"))removeNF(n.id);}}>✕</button></td>
+                                <td style={{padding:"8px 10px",color:T.textSub,maxWidth:"140px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{n.descricao||"—"}</td>
+                                <td style={{padding:"8px 10px"}}>
+                                  <div style={{display:"flex",gap:"4px"}}>
+                                    <button style={editB} onClick={()=>setEditNF({...n})}>✏️</button>
+                                    <button style={remB} onClick={()=>{if(confirm("Remover esta NF?"))removeNF(n.id);}}>✕</button>
+                                  </div>
+                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -2021,18 +2033,11 @@ Cancelar = Dar baixa só nesta parcela`);
                           <span style={{fontSize:"13px",color:T.textSub}}>Limite total: {fmt(limFam)}</span>
                         </div>
                         <p style={{fontSize:"28px",fontWeight:700,color:T.green,margin:"0 0 8px"}}>{fmt(totalFam)}</p>
-                        <div style={{height:12,background:"rgba(255,255,255,0.6)",borderRadius:6,border:"1px solid #BBF7D0",overflow:"hidden"}}>
-                          {meis.map((m,i)=>{
-                            const w=(faturadoAno(m.id)/limFam)*100;
-                            const left=meis.slice(0,i).reduce((s,mm)=>(s+faturadoAno(mm.id)/limFam)*100,0);
-                            return w>0?<div key={m.id} style={{position:"absolute",height:"12px",width:`${w}%`,left:`${left}%`,background:m.cor,opacity:0.85}}/>:null;
+                        <div style={{height:12,background:"rgba(255,255,255,0.6)",borderRadius:6,border:"1px solid #BBF7D0",overflow:"hidden",display:"flex",width:"100%"}}>
+                          {meis.map(m=>{
+                            const w=limFam>0?Math.min(100,(faturadoAno(m.id)/limFam)*100):0;
+                            return w>0?<div key={m.id} style={{height:"12px",width:`${w}%`,background:m.cor,flexShrink:0}}/>:null;
                           })}
-                          <div style={{position:"relative",height:"12px",display:"flex"}}>
-                            {meis.map(m=>{
-                              const w=(faturadoAno(m.id)/limFam)*100;
-                              return w>0?<div key={m.id} style={{height:"12px",width:`${w}%`,background:m.cor,opacity:0.9}}/>:null;
-                            })}
-                          </div>
                         </div>
                         <div style={{display:"flex",gap:"12px",marginTop:"6px",flexWrap:"wrap"}}>
                           {meis.map(m=><span key={m.id} style={{display:"flex",alignItems:"center",gap:"4px",fontSize:"11px",color:T.textSub}}><span style={{width:8,height:8,borderRadius:2,background:m.cor,display:"inline-block"}}/>{m.nome}: {fmt(faturadoAno(m.id))}</span>)}
@@ -2068,6 +2073,7 @@ Cancelar = Dar baixa só nesta parcela`);
                         {editMei?.id===m.id?(
                           <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:"10px"}}>
                             <div><label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Nome</label><input style={inpS} value={editMei.nome} onChange={e=>setEditMei(em=>({...em,nome:e.target.value}))}/></div>
+                            <div><label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Data de Abertura</label><input type="date" style={inpS} value={editMei.dataAbertura||""} onChange={e=>setEditMei(em=>({...em,dataAbertura:e.target.value}))}/></div>
                             <div><label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Cor</label>
                               <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
                                 <input type="color" value={editMei.cor} onChange={e=>setEditMei(em=>({...em,cor:e.target.value}))} style={{width:"36px",height:"36px",borderRadius:"8px",border:`1px solid ${T.border}`,cursor:"pointer",padding:"2px"}}/>
@@ -2093,7 +2099,21 @@ Cancelar = Dar baixa só nesta parcela`);
                               <div style={{width:"14px",height:"14px",borderRadius:"50%",background:m.cor,flexShrink:0}}/>
                               <div>
                                 <p style={{fontSize:"14px",fontWeight:600,color:T.text,margin:0}}>{m.nome}</p>
-                                <p style={{fontSize:"12px",color:T.textSub,margin:0}}>Limite: {fmt(m.limiteAnual||LIMITE_MEI_ANUAL)} • {m.tipo==="servicos"?"Serviços":m.tipo==="comercio"?"Comércio":"Serv+Com"}</p>
+                                <p style={{fontSize:"12px",color:T.textSub,margin:0}}>
+                                Limite: {fmt(m.limiteAnual||LIMITE_MEI_ANUAL)} • {m.tipo==="servicos"?"Serviços":m.tipo==="comercio"?"Comércio":"Serv+Com"}
+                                {m.dataAbertura&&<span style={{color:T.blue,marginLeft:"8px"}}>• Abertura: {m.dataAbertura}</span>}
+                              </p>
+                              {m.dataAbertura&&(()=>{
+                                const aberturaDate=new Date(m.dataAbertura+"T12:00:00");
+                                const anoAbertura=aberturaDate.getFullYear();
+                                if(anoAbertura===currentYear){
+                                  const mesAbertura=aberturaDate.getMonth();
+                                  const mesesAtivos=12-mesAbertura;
+                                  const limiteProp=(m.limiteAnual/12)*mesesAtivos;
+                                  return <p style={{fontSize:"11px",color:T.amber,margin:"2px 0 0"}}>⚠️ Ano de abertura: limite proporcional = {fmt(limiteProp)} ({mesesAtivos} meses ativos)</p>;
+                                }
+                                return null;
+                              })()}
                               </div>
                             </div>
                             <button style={editB} onClick={()=>setEditMei({...m})}>✏️ Editar</button>
@@ -2385,6 +2405,62 @@ Cancelar = Dar baixa só nesta parcela`);
               {activeSection===n.key&&<span style={{width:"4px",height:"4px",borderRadius:"50%",background:T.purple,display:"block"}}/>}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* EDIT NF MODAL */}
+      {editNF&&(
+        <div style={{position:"fixed",inset:0,zIndex:600,background:"rgba(0,0,0,0.45)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}} onClick={()=>setEditNF(null)}>
+          <div style={{background:T.surface,border:`2px solid ${T.green}30`,borderRadius:"18px",padding:"24px",width:"600px",maxWidth:"96vw",maxHeight:"90vh",overflowY:"auto",boxShadow:shadowMd}} onClick={e=>e.stopPropagation()}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"16px"}}>
+              <h3 style={{color:T.text,margin:0,fontSize:"16px",fontWeight:700,borderLeft:`4px solid ${T.green}`,paddingLeft:"10px"}}>✏️ Editar Nota Fiscal</h3>
+              <button style={{...btnG,padding:"4px 10px"}} onClick={()=>setEditNF(null)}>✕</button>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px",marginBottom:"12px"}}>
+              <div style={{gridColumn:"span 2"}}>
+                <label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>MEI</label>
+                <select style={selS} value={editNF.meiId} onChange={e=>setEditNF(n=>({...n,meiId:e.target.value}))}>
+                  {meiData.meis.map(m=><option key={m.id} value={m.id}>{m.nome}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Competência</label>
+                <input type="month" style={inpS} value={editNF.competencia||""} onChange={e=>setEditNF(n=>({...n,competencia:e.target.value}))}/>
+              </div>
+              <div>
+                <label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Data de Emissão</label>
+                <input type="date" style={inpS} value={editNF.dataEmissao||""} onChange={e=>setEditNF(n=>({...n,dataEmissao:e.target.value}))}/>
+              </div>
+              <div>
+                <label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Nº da NF</label>
+                <input style={inpS} value={editNF.numeroNF||""} onChange={e=>setEditNF(n=>({...n,numeroNF:e.target.value}))}/>
+              </div>
+              <div>
+                <label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Valor (R$)</label>
+                <input type="number" step="0.01" style={inpS} value={editNF.valor||""} onChange={e=>setEditNF(n=>({...n,valor:parseFloat(e.target.value)||0}))}/>
+              </div>
+              <div>
+                <label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Prestador (quem emite)</label>
+                <input style={inpS} value={editNF.prestador||""} onChange={e=>setEditNF(n=>({...n,prestador:e.target.value}))}/>
+              </div>
+              <div>
+                <label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Tomador (cliente)</label>
+                <input style={inpS} value={editNF.tomador||""} onChange={e=>setEditNF(n=>({...n,tomador:e.target.value}))}/>
+              </div>
+              <div style={{gridColumn:"span 2"}}>
+                <label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Descrição do serviço</label>
+                <input style={inpS} value={editNF.descricao||""} onChange={e=>setEditNF(n=>({...n,descricao:e.target.value}))}/>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:"8px",justifyContent:"flex-end",paddingTop:"14px",borderTop:`1px solid ${T.border}`}}>
+              <button style={btnP(T.green)} onClick={()=>{
+                setMeiData(d=>({...d,notas:d.notas.map(n=>n.id===editNF.id?editNF:n)}));
+                setEditNF(null);
+                showToast("NF atualizada!");
+              }}>✅ Salvar alteração</button>
+              <button style={btnG} onClick={()=>setEditNF(null)}>Cancelar</button>
+            </div>
+          </div>
         </div>
       )}
 
