@@ -321,6 +321,7 @@ export default function App(){
   const [editUso, setEditUso] = useState(null); // for editing a credit card purchase
   const [meiData, setMeiData] = useState(emptyMei());
   const [meiTab, setMeiTab] = useState("lancamentos");
+  const [meiViewYear, setMeiViewYear] = useState(new Date().getFullYear());
   const [meiVisualMonth, setMeiVisualMonth] = useState(new Date().toISOString().slice(0,7));
   const [nfForm, setNfForm] = useState(()=>emptyNFForm(new Date().toISOString().split("T")[0]));
   const [editNF, setEditNF] = useState(null);
@@ -1644,11 +1645,16 @@ Cancelar = Dar baixa só nesta parcela`);
         {/* ── MEI ── */}
         {activeSection==="mei"&&(()=>{
           const { meis, notas } = meiData;
-          const CY_STR = String(CY);
+          const CY_STR = String(meiViewYear); // usa ano próprio do MEI, independente do ano global
+
+          // Anos disponíveis baseado nas notas registradas
+          const anosDisponiveis = [...new Set(notas.map(n=>n.competencia?.slice(0,4)).filter(Boolean))].sort((a,b)=>Number(b)-Number(a));
+          const isPastYear = meiViewYear < new Date().getFullYear();
 
           // helpers
           const faturadoMes = (meiId, comp) => notas.filter(n=>n.meiId===meiId&&n.competencia===comp).reduce((s,n)=>s+parseFloat(n.valor||0),0);
           const faturadoAno = (meiId) => notas.filter(n=>n.meiId===meiId&&n.competencia?.startsWith(CY_STR)).reduce((s,n)=>s+parseFloat(n.valor||0),0);
+          const faturadoAnoEspecifico = (meiId, ano) => notas.filter(n=>n.meiId===meiId&&n.competencia?.startsWith(String(ano))).reduce((s,n)=>s+parseFloat(n.valor||0),0);
           const notasMes = (meiId, comp) => notas.filter(n=>n.meiId===meiId&&n.competencia===comp);
           const notasAnoMei = (meiId) => notas.filter(n=>n.meiId===meiId&&n.competencia?.startsWith(CY_STR));
           const mesesComDados = (meiId) => {
@@ -1773,7 +1779,7 @@ Cancelar = Dar baixa só nesta parcela`);
                     <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(2,1fr)",gap:"12px",marginBottom:"14px"}}>
                       {meis.map(m=>{
                         const fatMes=faturadoMes(m.id,nfForm.competencia);
-                        const limEf=getLimiteEfetivo(m,currentYear);
+                        const limEf=getLimiteEfetivo(m,meiViewYear);
                         const limMes=limEf/12;
                         const fatAno=faturadoAno(m.id);
                         const limAnual=limEf;
@@ -1812,7 +1818,15 @@ Cancelar = Dar baixa só nesta parcela`);
                   {/* Tabela todas as NFs */}
                   {notas.length>0&&(
                     <div style={card()}>
-                      <p style={{fontSize:"13px",fontWeight:700,color:T.text,marginBottom:"12px"}}>📋 Notas Fiscais Registradas ({notas.length})</p>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px",flexWrap:"wrap",gap:"8px"}}>
+                        <p style={{fontSize:"13px",fontWeight:700,color:T.text,margin:0}}>📋 Notas Fiscais Registradas ({notas.length})</p>
+                        <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
+                          {anosDisponiveis.map(ano=>(
+                            <button key={ano} style={{...subT(String(meiViewYear)===ano),fontSize:"11px",padding:"3px 10px"}} onClick={()=>setMeiViewYear(Number(ano))}>{ano}</button>
+                          ))}
+                          {anosDisponiveis.length>0&&<button style={{...subT(false),fontSize:"11px",padding:"3px 10px"}} onClick={()=>{}}>Todos</button>}
+                        </div>
+                      </div>
                       <div style={{overflowX:"auto"}}>
                         <table style={{width:"100%",borderCollapse:"collapse",fontSize:"12px"}}>
                           <thead>
@@ -1865,7 +1879,7 @@ Cancelar = Dar baixa só nesta parcela`);
                     <div style={{display:"flex",gap:"16px",alignItems:"flex-end",height:"160px",marginBottom:"8px",padding:"0 8px"}}>
                       {meis.map(m=>{
                         const fat=faturadoMes(m.id,meiVisualMonth);
-                        const limMes=getLimiteEfetivo(m,currentYear)/12;
+                        const limMes=getLimiteEfetivo(m,meiViewYear)/12;
                         const pct=Math.min(100,(fat/limMes)*100);
                         return(
                           <div key={m.id} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:"4px"}}>
@@ -1978,14 +1992,32 @@ Cancelar = Dar baixa só nesta parcela`);
               {/* ── VISÃO ANUAL ── */}
               {meiTab==="anual"&&(
                 <div>
+                  {/* Seletor de ano próprio do MEI */}
+                  <div style={{...card({marginBottom:"14px",padding:"12px 16px"}),background:T.purpleLight,border:`1px solid #DDD6FE`}}>
+                    <div style={{display:"flex",alignItems:"center",gap:"12px",flexWrap:"wrap",justifyContent:"space-between"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+                        <button style={{...btnG,padding:"5px 12px"}} onClick={()=>setMeiViewYear(y=>y-1)}>‹</button>
+                        <span style={{fontSize:"16px",fontWeight:700,color:T.purple,minWidth:"50px",textAlign:"center"}}>{meiViewYear}</span>
+                        <button style={{...btnG,padding:"5px 12px"}} onClick={()=>setMeiViewYear(y=>y+1)}>›</button>
+                        {isPastYear&&<span style={{...chip(T.amber),fontSize:"11px"}}>Ano concluído</span>}
+                      </div>
+                      {anosDisponiveis.length>0&&(
+                        <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
+                          {anosDisponiveis.map(ano=>(
+                            <button key={ano} style={{...subT(String(meiViewYear)===ano),fontSize:"11px",padding:"4px 12px"}} onClick={()=>setMeiViewYear(Number(ano))}>{ano}</button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                   {/* Alert projeção */}
-                  {meis.some(m=>projecaoAnual(m.id)>getLimiteEfetivo(m,currentYear))&&(
+                  {meis.some(m=>projecaoAnual(m.id)>getLimiteEfetivo(m,meiViewYear))&&(
                     <div style={{background:T.redLight,border:"1px solid #FECACA",borderRadius:"10px",padding:"12px 16px",marginBottom:"14px",display:"flex",alignItems:"center",gap:"12px"}}>
                       <span style={{fontSize:"22px"}}>🚨</span>
                       <div>
                         <p style={{color:T.red,fontWeight:700,fontSize:"13px",margin:0}}>Projeção acima do limite MEI!</p>
                         <p style={{color:"#B91C1C",fontSize:"12px",margin:"2px 0 0"}}>
-                          {meis.filter(m=>projecaoAnual(m.id)>getLimiteEfetivo(m,currentYear)).map(m=>`${m.nome}: projeção ${fmt(projecaoAnual(m.id))} (limite ${fmt(getLimiteEfetivo(m,currentYear))})`).join(" • ")}
+                          {meis.filter(m=>projecaoAnual(m.id)>getLimiteEfetivo(m,meiViewYear)).map(m=>`${m.nome}: projeção ${fmt(projecaoAnual(m.id))} (limite ${fmt(getLimiteEfetivo(m,meiViewYear))})`).join(" • ")}
                         </p>
                       </div>
                     </div>
@@ -1995,7 +2027,7 @@ Cancelar = Dar baixa só nesta parcela`);
                   <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(2,1fr)",gap:"14px",marginBottom:"14px"}}>
                     {meis.map(m=>{
                       const fatAno=faturadoAno(m.id);
-                      const limAnual=getLimiteEfetivo(m,currentYear);
+                      const limAnual=getLimiteEfetivo(m,meiViewYear);
                       const proj=projecaoAnual(m.id);
                       const restante=restanteLimite(m.id);
                       const mediaSeg=mediaMensalSegura(m.id);
@@ -2017,12 +2049,12 @@ Cancelar = Dar baixa só nesta parcela`);
                               <p style={{fontSize:"18px",fontWeight:700,color:restante>0?T.green:T.red,margin:0}}>{fmt(restante)}</p>
                             </div>
                             <div style={{background:T.surfaceAlt,borderRadius:"8px",padding:"10px"}}>
-                              <p style={{fontSize:"10px",color:T.textSub,margin:"0 0 3px",textTransform:"uppercase",letterSpacing:"0.06em"}}>Projeção Anual</p>
-                              <p style={{fontSize:"16px",fontWeight:700,color:projAcima?T.red:T.text,margin:0}}>{proj>0?fmt(proj):"—"}</p>
+                              <p style={{fontSize:"10px",color:T.textSub,margin:"0 0 3px",textTransform:"uppercase",letterSpacing:"0.06em"}}>{isPastYear?"Total Realizado":"Projeção Anual"}</p>
+                              <p style={{fontSize:"16px",fontWeight:700,color:isPastYear?m.cor:projAcima?T.red:T.text,margin:0}}>{isPastYear?fmt(fatAno):proj>0?fmt(proj):"—"}</p>
                             </div>
                             <div style={{background:T.surfaceAlt,borderRadius:"8px",padding:"10px"}}>
-                              <p style={{fontSize:"10px",color:T.textSub,margin:"0 0 3px",textTransform:"uppercase",letterSpacing:"0.06em"}}>Média Segura/mês</p>
-                              <p style={{fontSize:"16px",fontWeight:700,color:T.green,margin:0}}>{mediaSeg>0?fmt(mediaSeg):"—"}</p>
+                              <p style={{fontSize:"10px",color:T.textSub,margin:"0 0 3px",textTransform:"uppercase",letterSpacing:"0.06em"}}>{isPastYear?"Meses com NF":"Média Segura/mês"}</p>
+                              <p style={{fontSize:"16px",fontWeight:700,color:T.green,margin:0}}>{isPastYear?`${mesesComDados(m.id)} meses`:mediaSeg>0?fmt(mediaSeg):"—"}</p>
                             </div>
                           </div>
                           <div>
@@ -2030,7 +2062,7 @@ Cancelar = Dar baixa só nesta parcela`);
                               <span style={{color:T.textSub}}>{pctAnual.toFixed(1)}% do limite anual</span>
                               <span style={{color:T.textSub}}>
                                 Limite: {fmt(limAnual)}
-                                {m.dataAbertura&&new Date(m.dataAbertura+"T12:00:00").getFullYear()===currentYear&&(
+                                {m.dataAbertura&&new Date(m.dataAbertura+"T12:00:00").getFullYear()===meiViewYear&&(
                                   <span style={{color:T.amber,marginLeft:"4px",fontSize:"10px"}}>⚠️ proporcional</span>
                                 )}
                               </span>
@@ -2052,7 +2084,7 @@ Cancelar = Dar baixa só nesta parcela`);
                   {/* Card família consolidado */}
                   {meis.length>1&&(()=>{
                     const totalFam=meis.reduce((s,m)=>s+faturadoAno(m.id),0);
-                    const limFam=meis.reduce((s,m)=>s+getLimiteEfetivo(m,currentYear),0);
+                    const limFam=meis.reduce((s,m)=>s+getLimiteEfetivo(m,meiViewYear),0);
                     const pctFam=(totalFam/limFam)*100;
                     return(
                       <div style={{...card({marginBottom:"14px"}),background:"linear-gradient(135deg,#F0FDF4,#DCFCE7)",border:"1px solid #BBF7D0"}}>
@@ -2074,9 +2106,56 @@ Cancelar = Dar baixa só nesta parcela`);
                     );
                   })()}
 
+                  {/* Histórico por ano */}
+                  {anosDisponiveis.length>0&&(
+                    <div style={card()}>
+                      <p style={{fontSize:"13px",fontWeight:700,color:T.text,marginBottom:"12px"}}>📋 Histórico por Ano</p>
+                      <div style={{overflowX:"auto"}}>
+                        <table style={{width:"100%",borderCollapse:"collapse",fontSize:"12px"}}>
+                          <thead>
+                            <tr style={{background:T.surfaceAlt}}>
+                              <th style={{padding:"8px 12px",textAlign:"left",color:T.textSub,fontWeight:600,borderBottom:`1px solid ${T.border}`}}>Ano</th>
+                              {meis.map(m=><th key={m.id} style={{padding:"8px 12px",textAlign:"right",color:m.cor,fontWeight:600,borderBottom:`1px solid ${T.border}`}}>{m.nome}</th>)}
+                              <th style={{padding:"8px 12px",textAlign:"right",color:T.textSub,fontWeight:600,borderBottom:`1px solid ${T.border}`}}>Total Família</th>
+                              <th style={{padding:"8px 12px",textAlign:"right",color:T.textSub,fontWeight:600,borderBottom:`1px solid ${T.border}`}}>Limite Usado</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {anosDisponiveis.map(ano=>{
+                              const vals=meis.map(m=>faturadoAnoEspecifico(m.id,Number(ano)));
+                              const totalFam=vals.reduce((s,v)=>s+v,0);
+                              const limFamAno=meis.reduce((s,m)=>s+getLimiteEfetivo(m,Number(ano)),0);
+                              const pct=limFamAno>0?(totalFam/limFamAno)*100:0;
+                              const isViewing=String(meiViewYear)===ano;
+                              return(
+                                <tr key={ano} style={{background:isViewing?T.purpleLight:"transparent",cursor:"pointer"}} onClick={()=>setMeiViewYear(Number(ano))}>
+                                  <td style={{padding:"8px 12px",fontWeight:700,color:isViewing?T.purple:T.text}}>
+                                    {ano}{isViewing&&<span style={{fontSize:"10px",background:T.purple,color:"#fff",borderRadius:"10px",padding:"1px 6px",marginLeft:"6px"}}>atual</span>}
+                                  </td>
+                                  {vals.map((v,i)=>(
+                                    <td key={i} style={{padding:"8px 12px",textAlign:"right",color:meis[i].cor,fontWeight:v>0?600:400}}>{v>0?fmt(v):"—"}</td>
+                                  ))}
+                                  <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,color:T.text}}>{fmt(totalFam)}</td>
+                                  <td style={{padding:"8px 12px",textAlign:"right"}}>
+                                    <div style={{display:"flex",alignItems:"center",gap:"8px",justifyContent:"flex-end"}}>
+                                      <div style={{width:"60px",height:4,background:T.surfaceAlt,borderRadius:2,border:`1px solid ${T.border}`}}>
+                                        <div style={{height:4,width:`${Math.min(100,pct)}%`,background:pct>100?T.red:pct>80?T.amber:T.green,borderRadius:2}}/>
+                                      </div>
+                                      <span style={{color:pct>100?T.red:pct>80?T.amber:T.green,fontWeight:600}}>{pct.toFixed(1)}%</span>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Gráfico linha comparativo */}
                   <div style={card()}>
-                    <p style={{fontSize:"13px",fontWeight:700,color:T.text,marginBottom:"12px"}}>📈 Evolução Comparativa — {CY}</p>
+                    <p style={{fontSize:"13px",fontWeight:700,color:T.text,marginBottom:"12px"}}>📈 Evolução Comparativa — {meiViewYear}</p>
                     <ResponsiveContainer width="100%" height={200}>
                       <BarChart data={mesesChart} margin={{top:5,right:5,bottom:0,left:0}}>
                         <CartesianGrid strokeDasharray="3 3" stroke={T.border}/>
