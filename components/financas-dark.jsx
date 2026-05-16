@@ -989,10 +989,12 @@ Cancelar = Dar baixa só nesta parcela`);
                   <p style={{fontSize:"13px",fontWeight:600,color:T.text,marginBottom:"12px"}}>📅 Resumo Mensal — {CY}</p>
                   <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(2,1fr)":"repeat(4,1fr)",gap:"8px"}}>
                     {MONTHS.map((m,i)=>{
-                      const r=sumArr(safeData[i].receitas),d=sumArr(safeData[i].despesas),inv=sumArr(safeData[i].investimentos),emp=sumArr(safeData[i].emprestimos);
+                      const r=sumArr(safeData[i].receitas);
+                      const d=sumArr(safeData[i].despesas)+sumArr(safeData[i].emprestimos);
                       const cart=cartoes.reduce((s,c)=>s+getFat(c.id,CY,i),0);
-                      const s=r-d-inv-emp-cartoes.reduce((s2,c)=>s2+(!isPago(c.id,CY,i)?getFat(c.id,CY,i):0),0);
-                      const temDados=r>0||d>0||inv>0||emp>0;
+                      const inv=sumArr(safeData[i].investimentos);
+                      const s=r-d-cart; // Saldo real = Receitas - Despesas - Cartões
+                      const temDados=r>0||d>0||inv>0||cart>0;
                       return(
                         <div key={i} style={{background:temDados?T.surface:T.surfaceAlt,border:temDados?`1px solid ${T.borderStrong}`:`1px solid ${T.border}`,borderRadius:"10px",padding:"10px",cursor:"pointer",opacity:temDados?1:0.5,transition:"all 0.15s"}}
                           onClick={()=>{setCurrentMonth(i);setView("mes");}}>
@@ -1003,7 +1005,7 @@ Cancelar = Dar baixa só nesta parcela`);
                               {d>0&&<div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:T.textMuted}}>Desp</span><span style={{color:T.red,fontWeight:500}}>{fmtK(d)}</span></div>}
                               {cart>0&&<div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:T.textMuted}}>Cart</span><span style={{color:T.amber,fontWeight:500}}>{fmtK(cart)}</span></div>}
                               <div style={{display:"flex",justifyContent:"space-between",borderTop:`1px solid ${T.border}`,paddingTop:"2px",marginTop:"1px"}}>
-                                <span style={{color:T.textMuted}}>Saldo</span><span style={{color:s>=0?T.purple:T.red,fontWeight:700}}>{fmtK(s)}</span>
+                                <span style={{color:T.textSub,fontWeight:600}}>Saldo</span><span style={{color:s>=0?T.blue:T.red,fontWeight:700}}>{fmtK(s)}</span>
                               </div>
                             </div>
                           ):<p style={{fontSize:"10px",color:T.textMuted,margin:0}}>Sem dados</p>}
@@ -1149,19 +1151,30 @@ Cancelar = Dar baixa só nesta parcela`);
               <p style={{fontSize:"13px",fontWeight:600,color:T.text,marginBottom:"12px"}}>📅 Resumo {CY}</p>
               <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(2,1fr)":"repeat(4,1fr)",gap:"8px"}}>
                 {MONTHS.map((m,i)=>{
-                  const r=sumArr(safeData[i].receitas),d=sumArr(safeData[i].despesas),inv=sumArr(safeData[i].investimentos),emp=sumArr(safeData[i].emprestimos),cart=cartoes.reduce((s,c)=>s+getFat(c.id,CY,i),0);
-                  const s=r-d-inv-emp-cartoes.reduce((s2,c)=>s2+(!isPago(c.id,CY,i)?getFat(c.id,CY,i):0),0);
+                  const r=sumArr(safeData[i].receitas);
+                  const d=sumArr(safeData[i].despesas)+sumArr(safeData[i].emprestimos);
+                  const cart=cartoes.reduce((s,c)=>s+getFat(c.id,CY,i),0);
+                  const inv=sumArr(safeData[i].investimentos);
+                  const saldoReal=r-d-cart;
+                  const temDados=r>0||d>0||cart>0||inv>0;
+                  const isSelected=i===currentMonth;
                   return(
-                    <div key={i} style={{background:i===currentMonth?T.purpleLight:T.surfaceAlt,border:i===currentMonth?`1.5px solid ${T.purple}`:`1px solid ${T.border}`,borderRadius:"10px",padding:"10px",cursor:"pointer",transition:"all 0.15s"}} onClick={()=>setCurrentMonth(i)}>
-                      <p style={{fontSize:"11px",fontWeight:700,color:i===currentMonth?T.purple:T.textSub,marginBottom:"5px"}}>{m}</p>
-                      <div style={{fontSize:"10px",display:"flex",flexDirection:"column",gap:"2px"}}>
-                        {[["Rec",r,T.green],["Desp",d,T.red],["Cart",cart,T.amber],["Saldo",s,s>=0?T.purple:T.red]].map(([lbl,val,col])=>(
-                          <div key={lbl} style={{display:"flex",justifyContent:"space-between"}}>
-                            <span style={{color:T.textMuted}}>{lbl}</span>
-                            <span style={{color:col,fontWeight:lbl==="Saldo"?700:400}}>{fmtK(val)}</span>
+                    <div key={i}
+                      style={{background:isSelected?"#F0FDF4":temDados?T.surface:T.surfaceAlt,border:isSelected?`2px solid ${T.green}`:temDados?`1px solid ${T.borderStrong}`:`1px solid ${T.border}`,borderRadius:"10px",padding:"10px 12px",cursor:"pointer",transition:"all 0.15s",opacity:temDados?1:0.5}}
+                      onClick={()=>setCurrentMonth(i)}>
+                      <p style={{fontSize:"11px",fontWeight:700,color:isSelected?T.green:temDados?T.text:T.textMuted,marginBottom:"6px"}}>{m}</p>
+                      {temDados?(
+                        <div style={{fontSize:"10px",display:"flex",flexDirection:"column",gap:"3px"}}>
+                          {r>0&&<div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:T.textMuted}}>Rec</span><span style={{color:T.green,fontWeight:500}}>{fmtK(r)}</span></div>}
+                          {d>0&&<div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:T.textMuted}}>Desp</span><span style={{color:T.red,fontWeight:500}}>{fmtK(d)}</span></div>}
+                          {cart>0&&<div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:T.textMuted}}>Cart</span><span style={{color:T.amber,fontWeight:500}}>{fmtK(cart)}</span></div>}
+                          {inv>0&&<div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:T.textMuted}}>Inv</span><span style={{color:T.blue,fontWeight:500}}>{fmtK(inv)}</span></div>}
+                          <div style={{display:"flex",justifyContent:"space-between",borderTop:`1px solid ${T.border}`,paddingTop:"3px",marginTop:"2px"}}>
+                            <span style={{color:T.textSub,fontWeight:600}}>Saldo</span>
+                            <span style={{color:saldoReal>=0?T.blue:T.red,fontWeight:700}}>{fmtK(saldoReal)}</span>
                           </div>
-                        ))}
-                      </div>
+                        </div>
+                      ):<p style={{fontSize:"10px",color:T.textMuted,margin:0,textAlign:"center"}}>Sem dados</p>}
                     </div>
                   );
                 })}
