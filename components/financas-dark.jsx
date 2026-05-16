@@ -1657,15 +1657,32 @@ Cancelar = Dar baixa só nesta parcela`);
           };
           const restanteLimite = (meiId) => {
             const mei = meis.find(m=>m.id===meiId);
-            return Math.max(0,(mei?.limiteAnual||LIMITE_MEI_ANUAL)-faturadoAno(meiId));
+            return Math.max(0,getLimiteEfetivo(mei,currentYear)-faturadoAno(meiId));
           };
           const mediaMensalSegura = (meiId) => {
             const mei = meis.find(m=>m.id===meiId);
             const mAtual = new Date().getMonth();
-            const mesesRestantes = 12-mAtual;
+            // Se MEI abriu neste ano, contar a partir do mês de abertura
+            let mInicio = 0;
+            if(mei?.dataAbertura){
+              const ab = new Date(mei.dataAbertura+"T12:00:00");
+              if(ab.getFullYear()===currentYear) mInicio = ab.getMonth();
+            }
+            const mesesRestantes = 12 - Math.max(mAtual, mInicio);
             return mesesRestantes>0?restanteLimite(meiId)/mesesRestantes:0;
           };
           const pctLimite = (valor, limiteAnual) => Math.min(100,(valor/(limiteAnual||LIMITE_MEI_ANUAL))*100);
+
+          // Calcula o limite efetivo do MEI para o ano — proporcional se abriu neste ano
+          const getLimiteEfetivo = (mei, year) => {
+            const limBase = mei?.limiteAnual || LIMITE_MEI_ANUAL;
+            if(!mei?.dataAbertura) return limBase;
+            const abDate = new Date(mei.dataAbertura + "T12:00:00");
+            if(abDate.getFullYear() !== year) return limBase;
+            // Meses ativos = do mês de abertura até dezembro (inclusive)
+            const mesesAtivos = 12 - abDate.getMonth();
+            return parseFloat(((limBase / 12) * mesesAtivos).toFixed(2));
+          };
 
           const addNF = () => {
             const { meiId, competencia, numeroNF, valor, prestador, tomador, descricao } = nfForm;
@@ -1751,9 +1768,10 @@ Cancelar = Dar baixa só nesta parcela`);
                     <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(2,1fr)",gap:"12px",marginBottom:"14px"}}>
                       {meis.map(m=>{
                         const fatMes=faturadoMes(m.id,nfForm.competencia);
-                        const limMes=m.limiteAnual/12;
+                        const limEf=getLimiteEfetivo(m,currentYear);
+                        const limMes=limEf/12;
                         const fatAno=faturadoAno(m.id);
-                        const limAnual=m.limiteAnual||LIMITE_MEI_ANUAL;
+                        const limAnual=limEf;
                         const pctMes=pctLimite(fatMes,limMes);
                         const pctAno=(fatAno/limAnual)*100;
                         return(
@@ -1842,7 +1860,7 @@ Cancelar = Dar baixa só nesta parcela`);
                     <div style={{display:"flex",gap:"16px",alignItems:"flex-end",height:"160px",marginBottom:"8px",padding:"0 8px"}}>
                       {meis.map(m=>{
                         const fat=faturadoMes(m.id,meiVisualMonth);
-                        const limMes=m.limiteAnual/12;
+                        const limMes=getLimiteEfetivo(m,currentYear)/12;
                         const pct=Math.min(100,(fat/limMes)*100);
                         return(
                           <div key={m.id} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:"4px"}}>
@@ -1956,13 +1974,13 @@ Cancelar = Dar baixa só nesta parcela`);
               {meiTab==="anual"&&(
                 <div>
                   {/* Alert projeção */}
-                  {meis.some(m=>projecaoAnual(m.id)>(m.limiteAnual||LIMITE_MEI_ANUAL))&&(
+                  {meis.some(m=>projecaoAnual(m.id)>getLimiteEfetivo(m,currentYear))&&(
                     <div style={{background:T.redLight,border:"1px solid #FECACA",borderRadius:"10px",padding:"12px 16px",marginBottom:"14px",display:"flex",alignItems:"center",gap:"12px"}}>
                       <span style={{fontSize:"22px"}}>🚨</span>
                       <div>
                         <p style={{color:T.red,fontWeight:700,fontSize:"13px",margin:0}}>Projeção acima do limite MEI!</p>
                         <p style={{color:"#B91C1C",fontSize:"12px",margin:"2px 0 0"}}>
-                          {meis.filter(m=>projecaoAnual(m.id)>(m.limiteAnual||LIMITE_MEI_ANUAL)).map(m=>`${m.nome}: projeção ${fmt(projecaoAnual(m.id))} (limite ${fmt(m.limiteAnual||LIMITE_MEI_ANUAL)})`).join(" • ")}
+                          {meis.filter(m=>projecaoAnual(m.id)>getLimiteEfetivo(m,currentYear)).map(m=>`${m.nome}: projeção ${fmt(projecaoAnual(m.id))} (limite ${fmt(getLimiteEfetivo(m,currentYear))})`).join(" • ")}
                         </p>
                       </div>
                     </div>
@@ -1972,7 +1990,7 @@ Cancelar = Dar baixa só nesta parcela`);
                   <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(2,1fr)",gap:"14px",marginBottom:"14px"}}>
                     {meis.map(m=>{
                       const fatAno=faturadoAno(m.id);
-                      const limAnual=m.limiteAnual||LIMITE_MEI_ANUAL;
+                      const limAnual=getLimiteEfetivo(m,currentYear);
                       const proj=projecaoAnual(m.id);
                       const restante=restanteLimite(m.id);
                       const mediaSeg=mediaMensalSegura(m.id);
@@ -2005,7 +2023,12 @@ Cancelar = Dar baixa só nesta parcela`);
                           <div>
                             <div style={{display:"flex",justifyContent:"space-between",fontSize:"12px",marginBottom:"4px"}}>
                               <span style={{color:T.textSub}}>{pctAnual.toFixed(1)}% do limite anual</span>
-                              <span style={{color:T.textSub}}>Limite: {fmt(limAnual)}</span>
+                              <span style={{color:T.textSub}}>
+                                Limite: {fmt(limAnual)}
+                                {m.dataAbertura&&new Date(m.dataAbertura+"T12:00:00").getFullYear()===currentYear&&(
+                                  <span style={{color:T.amber,marginLeft:"4px",fontSize:"10px"}}>⚠️ proporcional</span>
+                                )}
+                              </span>
                             </div>
                             <div style={{height:10,background:T.surfaceAlt,borderRadius:6,border:`1px solid ${T.border}`}}>
                               <div style={{height:10,width:`${Math.min(100,pctAnual)}%`,background:pctAnual>90?T.red:pctAnual>70?T.amber:m.cor,borderRadius:6,transition:"width 0.5s"}}/>
@@ -2024,7 +2047,7 @@ Cancelar = Dar baixa só nesta parcela`);
                   {/* Card família consolidado */}
                   {meis.length>1&&(()=>{
                     const totalFam=meis.reduce((s,m)=>s+faturadoAno(m.id),0);
-                    const limFam=meis.reduce((s,m)=>s+(m.limiteAnual||LIMITE_MEI_ANUAL),0);
+                    const limFam=meis.reduce((s,m)=>s+getLimiteEfetivo(m,currentYear),0);
                     const pctFam=(totalFam/limFam)*100;
                     return(
                       <div style={{...card({marginBottom:"14px"}),background:"linear-gradient(135deg,#F0FDF4,#DCFCE7)",border:"1px solid #BBF7D0"}}>
@@ -2101,7 +2124,7 @@ Cancelar = Dar baixa só nesta parcela`);
                               <div>
                                 <p style={{fontSize:"14px",fontWeight:600,color:T.text,margin:0}}>{m.nome}</p>
                                 <p style={{fontSize:"12px",color:T.textSub,margin:0}}>
-                                Limite: {fmt(m.limiteAnual||LIMITE_MEI_ANUAL)} • {m.tipo==="servicos"?"Serviços":m.tipo==="comercio"?"Comércio":"Serv+Com"}{m.cnpj&&<span style={{color:T.textMuted,marginLeft:"8px"}}>• CNPJ: {m.cnpj}</span>}
+                                {(()=>{const le=getLimiteEfetivo(m,currentYear);const isDiff=le!==(m.limiteAnual||LIMITE_MEI_ANUAL);return<>Limite: {isDiff?<><span style={{textDecoration:"line-through",color:T.textMuted}}>{fmt(m.limiteAnual||LIMITE_MEI_ANUAL)}</span><span style={{color:T.amber,marginLeft:"4px",fontWeight:700}}>{fmt(le)} (proporcional)</span></>:fmt(m.limiteAnual||LIMITE_MEI_ANUAL)} • {m.tipo==="servicos"?"Serviços":m.tipo==="comercio"?"Comércio":"Serv+Com"}{m.cnpj&&<span style={{color:T.textMuted,marginLeft:"8px"}}>• CNPJ: {m.cnpj}</span>}</>;})()}
                                 {m.dataAbertura&&<span style={{color:T.blue,marginLeft:"8px"}}>• Abertura: {m.dataAbertura}</span>}
                               </p>
                               {m.dataAbertura&&(()=>{
