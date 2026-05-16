@@ -274,11 +274,20 @@ function ItemList({items,col,emptyMsg,onEdit,onRemove,onBaixa,tipo}){
 // ── Main App ───────────────────────────────────────────────────────────────
 export default function App(){
   const today = new Date().toISOString().split("T")[0];
-  const CY = 2026, nowM = new Date().getMonth();
+  const CY = currentYear; const nowM = new Date().getMonth();
   const yrMs = Array.from({length:12},(_,i)=>i);
 
+  // ── MULTI-ANO ─────────────────────────────────────────────────
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [allYearsData, setAllYearsData] = useState({ [String(new Date().getFullYear())]: emptyYear() });
+  // data = janela do ano atual; setData = atualiza apenas o ano atual
+  const data = allYearsData[String(currentYear)] || emptyYear();
+  const setData = (updaterOrValue) => setAllYearsData(all => {
+    const yr = String(currentYear);
+    const prev = all[yr] || emptyYear();
+    return { ...all, [yr]: typeof updaterOrValue === 'function' ? updaterOrValue(prev) : updaterOrValue };
+  });
   // state
-  const [data, setData] = useState(emptyYear());
   const [cadastros, setCadastros] = useState(emptyCadastros());
   const [cartoes, setCartoes] = useState([]);
   const [usoCartoes, setUsoCartoes] = useState([]);
@@ -331,11 +340,24 @@ export default function App(){
       try {
         const {data:row} = await supabase.from("financas_compartilhadas").select("*").eq("id",CASAL_ID).single();
         if(row){
-          const base = emptyYear();
+          // Migração: array antigo → multi-ano
+          let loadedAllYears = {};
           if(Array.isArray(row.data)&&row.data.length>0){
+            // formato antigo: array de 12 meses → 2026
+            const base = emptyYear();
             row.data.forEach((m,i)=>{ if(i<12&&m) base[i]={month:i,receitas:Array.isArray(m.receitas)?m.receitas:[],despesas:Array.isArray(m.despesas)?m.despesas:[],investimentos:Array.isArray(m.investimentos)?m.investimentos:[],emprestimos:Array.isArray(m.emprestimos)?m.emprestimos:[]}; });
+            loadedAllYears = { "2026": base };
+          } else if(row.data&&typeof row.data==="object"&&!Array.isArray(row.data)){
+            // formato novo: { "2026": [...], "2025": [...] }
+            Object.entries(row.data).forEach(([yr,months])=>{
+              if(Array.isArray(months)){
+                const base = emptyYear();
+                months.forEach((m,i)=>{ if(i<12&&m) base[i]={month:i,receitas:Array.isArray(m.receitas)?m.receitas:[],despesas:Array.isArray(m.despesas)?m.despesas:[],investimentos:Array.isArray(m.investimentos)?m.investimentos:[],emprestimos:Array.isArray(m.emprestimos)?m.emprestimos:[]}; });
+                loadedAllYears[yr]=base;
+              }
+            });
           }
-          setData(base);
+          if(Object.keys(loadedAllYears).length>0) setAllYearsData(loadedAllYears);
           if(row.cartoes&&Array.isArray(row.cartoes))setCartoes(row.cartoes);
           if(row.uso_cartoes&&Array.isArray(row.uso_cartoes))setUsoCartoes(row.uso_cartoes);
           if(row.pagamentos&&typeof row.pagamentos==="object")setPagamentos(row.pagamentos);
@@ -349,11 +371,21 @@ export default function App(){
     const ch = supabase.channel("fin_rt")
       .on("postgres_changes",{event:"UPDATE",schema:"public",table:"financas_compartilhadas",filter:`id=eq.${CASAL_ID}`},(payload)=>{
         const row = payload.new;
-        const base = emptyYear();
+        let rtAllYears = {};
         if(Array.isArray(row.data)&&row.data.length>0){
+          const base=emptyYear();
           row.data.forEach((m,i)=>{ if(i<12&&m) base[i]={month:i,receitas:Array.isArray(m.receitas)?m.receitas:[],despesas:Array.isArray(m.despesas)?m.despesas:[],investimentos:Array.isArray(m.investimentos)?m.investimentos:[],emprestimos:Array.isArray(m.emprestimos)?m.emprestimos:[]}; });
+          rtAllYears={"2026":base};
+        } else if(row.data&&typeof row.data==="object"&&!Array.isArray(row.data)){
+          Object.entries(row.data).forEach(([yr,months])=>{
+            if(Array.isArray(months)){
+              const base=emptyYear();
+              months.forEach((m,i)=>{ if(i<12&&m) base[i]={month:i,receitas:Array.isArray(m.receitas)?m.receitas:[],despesas:Array.isArray(m.despesas)?m.despesas:[],investimentos:Array.isArray(m.investimentos)?m.investimentos:[],emprestimos:Array.isArray(m.emprestimos)?m.emprestimos:[]}; });
+              rtAllYears[yr]=base;
+            }
+          });
         }
-        setData(base);
+        if(Object.keys(rtAllYears).length>0) setAllYearsData(rtAllYears);
         if(row.cartoes&&Array.isArray(row.cartoes))setCartoes(row.cartoes);
         if(row.uso_cartoes&&Array.isArray(row.uso_cartoes))setUsoCartoes(row.uso_cartoes);
         if(row.pagamentos&&typeof row.pagamentos==="object")setPagamentos(row.pagamentos);
@@ -368,7 +400,7 @@ export default function App(){
     const supabase = createClient();
     const {error} = await supabase.from("financas_compartilhadas").upsert({
       id:CASAL_ID, updated_at:new Date().toISOString(),
-      data:Array.isArray(payload.data)?payload.data:emptyYear(),
+      data:payload.allYearsData||payload.data||{},
       cartoes:Array.isArray(payload.cartoes)?payload.cartoes:[],
       uso_cartoes:Array.isArray(payload.uso_cartoes)?payload.uso_cartoes:[],
       pagamentos:payload.pagamentos||{},
@@ -415,7 +447,7 @@ export default function App(){
       if(confirm("Esta fatura já está marcada como paga. Desmarcar?")) {
         const np={...pagamentos,[`${cid}_${y}_${m}`]:null};
         setPagamentos(np);
-        saveToSupa({data:safeData,cartoes,uso_cartoes:usoCartoes,pagamentos:np,sync_url:syncUrl,cadastros}).catch(()=>{});
+        saveToSupa({allYearsData:{...allYearsData,[String(currentYear)]:safeData},cartoes,uso_cartoes:usoCartoes,pagamentos:np,sync_url:syncUrl,cadastros}).catch(()=>{});
       }
       return;
     }
@@ -444,7 +476,7 @@ export default function App(){
       historico:[...(pagAtual?.historico||[]),{valor:valorPago,data:pagForm.data||today,obs:pagForm.obs}],
     }};
     setPagamentos(np);
-    try{await saveToSupa({data:safeData,cartoes,uso_cartoes:usoCartoes,pagamentos:np,sync_url:syncUrl,cadastros});showToast(pagamentoTotal?"✅ Fatura paga integralmente!":"⚡ Pagamento parcial registrado!");}catch(_){showToast("Erro ao salvar","error");}
+    try{await saveToSupa({allYearsData:{...allYearsData,[String(currentYear)]:safeData},cartoes,uso_cartoes:usoCartoes,pagamentos:np,sync_url:syncUrl,cadastros});showToast(pagamentoTotal?"✅ Fatura paga integralmente!":"⚡ Pagamento parcial registrado!");}catch(_){showToast("Erro ao salvar","error");}
     setPagamentoModal(null);
   };
 
@@ -743,7 +775,7 @@ Cancelar = Dar baixa só nesta parcela`);
   };
 
   const handleSave=async()=>{
-    try{await saveToSupa({data:safeData,cartoes,uso_cartoes:usoCartoes,pagamentos,sync_url:syncUrl,cadastros});showToast("✅ Salvo! Lucas verá em instantes.");}
+    try{await saveToSupa({allYearsData:{...allYearsData,[String(currentYear)]:safeData},cartoes,uso_cartoes:usoCartoes,pagamentos,sync_url:syncUrl,cadastros,mei_data:meiData});showToast("✅ Salvo! Lucas verá em instantes.");}
     catch(e){console.error(e);showToast("Erro ao salvar","error");}
   };
 
@@ -839,12 +871,22 @@ Cancelar = Dar baixa só nesta parcela`);
               {!isMobile&&<div style={{display:"flex",background:T.surfaceAlt,borderRadius:"10px",padding:"3px",border:`1px solid ${T.border}`,gap:"2px"}}>
                 {["mes","ano"].map(v=><button key={v} style={toggleB(view===v)} onClick={()=>setView(v)}>{v==="mes"?"Mês":"Ano"}</button>)}
               </div>}
-              <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
-                {view==="mes"&&<button style={{...btnG,padding:"6px 10px"}} onClick={()=>setCurrentMonth(m=>Math.max(0,m-1))}>‹</button>}
-                <span style={{fontSize:"14px",fontWeight:600,color:T.text,minWidth:"130px",textAlign:"center"}}>
-                  {view==="mes"?`${MONTHS[currentMonth]} ${CY}`:`Ano ${CY}`}
-                </span>
-                {view==="mes"&&<button style={{...btnG,padding:"6px 10px"}} onClick={()=>setCurrentMonth(m=>Math.min(11,m+1))}>›</button>}
+              <div style={{display:"flex",alignItems:"center",gap:"6px",flexWrap:"wrap"}}>
+                {/* Navegação de ANO */}
+                <div style={{display:"flex",alignItems:"center",gap:"4px",background:T.surfaceAlt,borderRadius:"8px",padding:"2px",border:`1px solid ${T.border}`}}>
+                  <button style={{...btnG,padding:"4px 8px",border:"none",background:"transparent"}} onClick={()=>setCurrentYear(y=>y-1)}>‹</button>
+                  <span style={{fontSize:"13px",fontWeight:700,color:T.purple,minWidth:"40px",textAlign:"center"}}>{CY}</span>
+                  <button style={{...btnG,padding:"4px 8px",border:"none",background:"transparent"}} onClick={()=>setCurrentYear(y=>y+1)}>›</button>
+                </div>
+                {/* Navegação de MÊS (só na view Mês) */}
+                {view==="mes"&&(
+                  <div style={{display:"flex",alignItems:"center",gap:"4px"}}>
+                    <button style={{...btnG,padding:"6px 10px"}} onClick={()=>setCurrentMonth(m=>Math.max(0,m-1))}>‹</button>
+                    <span style={{fontSize:"13px",fontWeight:600,color:T.text,minWidth:"90px",textAlign:"center"}}>{MONTHS[currentMonth]}</span>
+                    <button style={{...btnG,padding:"6px 10px"}} onClick={()=>setCurrentMonth(m=>Math.min(11,m+1))}>›</button>
+                  </div>
+                )}
+                {view==="ano"&&<span style={{fontSize:"13px",fontWeight:600,color:T.text}}>Visão Anual</span>}
               </div>
             </div>
           )}
@@ -1210,6 +1252,72 @@ Cancelar = Dar baixa só nesta parcela`);
                 </table>
               </div>
             </div>
+
+            {/* Comparativo entre anos */}
+            {Object.keys(allYearsData).length>1&&(()=>{
+              const anos = Object.keys(allYearsData).sort((a,b)=>Number(b)-Number(a));
+              const anoTotais = anos.map(yr=>({
+                ano:yr,
+                receitas:allYearsData[yr].reduce((s,m)=>s+sumArr(m.receitas),0),
+                despesas:allYearsData[yr].reduce((s,m)=>s+sumArr(m.despesas),0),
+                investimentos:allYearsData[yr].reduce((s,m)=>s+sumArr(m.investimentos),0),
+                emprestimos:allYearsData[yr].reduce((s,m)=>s+sumArr(m.emprestimos),0),
+                cartoes:yrMs.reduce((s,i)=>s+cartoes.reduce((ss,c)=>ss+getFat(c.id,Number(yr),i),0),0),
+              }));
+              return(
+                <div style={card()}>
+                  <p style={{fontSize:"13px",fontWeight:700,color:T.text,marginBottom:"14px"}}>📊 Comparativo entre Anos</p>
+                  <div style={{overflowX:"auto"}}>
+                    <table style={{width:"100%",borderCollapse:"collapse",fontSize:"12px"}}>
+                      <thead>
+                        <tr style={{background:T.surfaceAlt}}>
+                          {["Ano","Receitas","Despesas","Investimentos","Empréstimos","Cartões","Saldo"].map(h=>(
+                            <th key={h} style={{padding:"9px 12px",textAlign:h==="Ano"?"left":"right",color:T.textSub,fontWeight:600,borderBottom:`1px solid ${T.border}`}}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {anoTotais.map((at,i)=>{
+                          const saldo=at.receitas-at.despesas-at.investimentos-at.emprestimos;
+                          const prevAt=anoTotais[i+1];
+                          const diffRec=prevAt?((at.receitas-prevAt.receitas)/prevAt.receitas*100):null;
+                          return(
+                            <tr key={at.ano} style={{background:Number(at.ano)===currentYear?T.purpleLight:"transparent",cursor:"pointer"}} onClick={()=>setCurrentYear(Number(at.ano))}>
+                              <td style={{padding:"9px 12px",fontWeight:700,color:Number(at.ano)===currentYear?T.purple:T.text}}>
+                                {at.ano} {Number(at.ano)===currentYear&&<span style={{fontSize:"10px",background:T.purple,color:"#fff",borderRadius:"10px",padding:"1px 6px",marginLeft:"4px"}}>atual</span>}
+                              </td>
+                              <td style={{padding:"9px 12px",textAlign:"right"}}>
+                                <span style={{color:T.green,fontWeight:600}}>{fmt(at.receitas)}</span>
+                                {diffRec!==null&&<span style={{fontSize:"10px",color:diffRec>=0?T.green:T.red,marginLeft:"4px"}}>{diffRec>=0?"▲":"▼"}{Math.abs(diffRec).toFixed(1)}%</span>}
+                              </td>
+                              <td style={{padding:"9px 12px",textAlign:"right",color:T.red,fontWeight:600}}>{fmt(at.despesas)}</td>
+                              <td style={{padding:"9px 12px",textAlign:"right",color:T.blue,fontWeight:500}}>{fmt(at.investimentos)}</td>
+                              <td style={{padding:"9px 12px",textAlign:"right",color:T.amber,fontWeight:500}}>{at.emprestimos>0?fmt(at.emprestimos):"—"}</td>
+                              <td style={{padding:"9px 12px",textAlign:"right",color:T.amber,fontWeight:500}}>{at.cartoes>0?fmt(at.cartoes):"—"}</td>
+                              <td style={{padding:"9px 12px",textAlign:"right",fontWeight:700,color:saldo>=0?T.purple:T.red}}>{fmt(saldo)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {/* Gráfico barras comparativo */}
+                  <div style={{marginTop:"16px"}}>
+                    <ResponsiveContainer width="100%" height={180}>
+                      <BarChart data={anoTotais.map(at=>({name:at.ano,Receitas:at.receitas,Despesas:at.despesas,Investimentos:at.investimentos}))} margin={{top:5,right:5,bottom:0,left:0}}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={T.border}/>
+                        <XAxis dataKey="name" tick={{fill:T.textMuted,fontSize:11}} axisLine={false} tickLine={false}/>
+                        <YAxis tickFormatter={fmtK} tick={{fill:T.textMuted,fontSize:10}} axisLine={false} tickLine={false}/>
+                        <Tooltip content={<CT/>}/>
+                        <Bar dataKey="Receitas" fill={T.green} radius={[4,4,0,0]}/>
+                        <Bar dataKey="Despesas" fill={T.red} radius={[4,4,0,0]}/>
+                        <Bar dataKey="Investimentos" fill={T.blue} radius={[4,4,0,0]}/>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -2049,7 +2157,7 @@ Cancelar = Dar baixa só nesta parcela`);
               <p style={{color:T.textSub,fontSize:"13px",marginBottom:"12px"}}>Cole o arquivo <strong>google-apps-script.js</strong> no Google Apps Script e implante como App da Web.</p>
               <div style={{display:"flex",gap:"8px",marginBottom:"10px"}}>
                 <input style={{...inpS,flex:1}} placeholder="https://script.google.com/macros/s/..." value={syncUrl} onChange={e=>setSyncUrl(e.target.value)}/>
-                <button style={btnP(T.green)} onClick={async()=>{try{await saveToSupa({data:safeData,cartoes,uso_cartoes:usoCartoes,pagamentos,sync_url:syncUrl,cadastros});showToast("URL salva!");}catch(_){showToast("Erro","error");}}}>Salvar</button>
+                <button style={btnP(T.green)} onClick={async()=>{try{await saveToSupa({allYearsData:{...allYearsData,[String(currentYear)]:safeData},cartoes,uso_cartoes:usoCartoes,pagamentos,sync_url:syncUrl,cadastros});showToast("URL salva!");}catch(_){showToast("Erro","error");}}}>Salvar</button>
               </div>
               <button style={btnO(T.purple)} onClick={async()=>{if(!syncUrl){setSyncStatus({ok:false,msg:"Cole a URL primeiro"});return;}setSyncing(true);try{const r=await fetch(`${syncUrl}?action=test`);const j=await r.json();setSyncStatus({ok:true,msg:j.message||"✅ Conexão OK!"});}catch{setSyncStatus({ok:false,msg:"❌ Erro de conexão"});}setSyncing(false);}}>
                 {syncing?"⏳ Testando...":"📡 Testar conexão"}
@@ -2103,7 +2211,7 @@ Cancelar = Dar baixa só nesta parcela`);
         <div style={{display:"flex",gap:"8px",flexWrap:"wrap",justifyContent:"center",marginTop:"20px",paddingTop:"16px",borderTop:`1px solid ${T.border}`}}>
           <button style={btnP(T.green)} onClick={handleSave}>💾 Salvar</button>
           <button style={btnO(T.amber)} onClick={()=>setShowLote(true)}>📋 Lote</button>
-          <button style={btnP(T.amber)} onClick={()=>{const b=new Blob([JSON.stringify({data:safeData,cartoes,usoCartoes,pagamentos,cadastros},null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=`financas_${CY}.json`;a.click();showToast("Exportado!");}}>📤 Exportar</button>
+          <button style={btnP(T.amber)} onClick={()=>{const b=new Blob([JSON.stringify({allYearsData,cartoes,usoCartoes,pagamentos,cadastros,mei_data:meiData},null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=`financas_${CY}.json`;a.click();showToast("Exportado!");}}>📤 Exportar</button>
           <button style={btnO(T.purple)} onClick={()=>setShowImport(true)}>📥 Importar</button>
           <button style={btnO(T.red)} onClick={()=>{if(!confirm("Resetar todos os dados?"))return;setData(emptyYear());setCartoes([]);setUsoCartoes([]);setPagamentos({});setCadastros(emptyCadastros());showToast("Resetado","error");}}>🗑 Reset</button>
         </div>
@@ -2163,7 +2271,7 @@ Cancelar = Dar baixa só nesta parcela`);
             <h3 style={{color:T.text,margin:"0 0 8px"}}>📥 Importar JSON</h3>
             <textarea style={{width:"100%",border:`1.5px solid ${T.borderStrong}`,borderRadius:"10px",padding:"10px",color:T.text,fontSize:"12px",outline:"none",resize:"vertical",minHeight:"110px",boxSizing:"border-box",fontFamily:"monospace",background:T.surfaceAlt}} id="importArea" placeholder='{"data":[...],"cartoes":[...]}' />
             <div style={{display:"flex",gap:"8px",marginTop:"14px",justifyContent:"flex-end"}}>
-              <button style={btnP(T.purple)} onClick={()=>{try{const imp=JSON.parse(document.getElementById("importArea").value);if(imp.data&&Array.isArray(imp.data)){setData(imp.data);if(imp.cartoes)setCartoes(imp.cartoes);if(imp.usoCartoes)setUsoCartoes(imp.usoCartoes);if(imp.pagamentos)setPagamentos(imp.pagamentos);if(imp.cadastros)setCadastros({...emptyCadastros(),...imp.cadastros});setShowImport(false);showToast("Importado!");}else showToast("Formato inválido","error");}catch{showToast("JSON inválido","error");}}}>✓ Importar</button>
+              <button style={btnP(T.purple)} onClick={()=>{try{const imp=JSON.parse(document.getElementById("importArea").value);if(imp.allYearsData||imp.data){if(imp.allYearsData)setAllYearsData(imp.allYearsData);else if(Array.isArray(imp.data))setAllYearsData({[String(currentYear)]:imp.data});if(imp.cartoes)setCartoes(imp.cartoes);if(imp.usoCartoes)setUsoCartoes(imp.usoCartoes);if(imp.pagamentos)setPagamentos(imp.pagamentos);if(imp.cadastros)setCadastros({...emptyCadastros(),...imp.cadastros});if(imp.mei_data)setMeiData({...emptyMei(),...imp.mei_data});setShowImport(false);showToast("Importado!");}else showToast("Formato inválido","error");}catch{showToast("JSON inválido","error");}}}>✓ Importar</button>
               <button style={btnG} onClick={()=>setShowImport(false)}>Cancelar</button>
             </div>
           </div>
