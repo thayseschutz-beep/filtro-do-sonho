@@ -546,38 +546,31 @@ export default function App(){
       const parcelas=parseInt(f.parcelas)||1;
       const valorTotal=parseFloat(f.valor)||0;
 
-      // ── PARCELADO: distribui nos meses seguintes ──────────────────
+      // ── PARCELADO: distribui nos meses seguintes (MULTI-ANO) ──────
       if(f.formaPag==="parcelado"&&parcelas>1){
         const valorParcela=parseFloat((valorTotal/parcelas).toFixed(2));
         const startMonth=new Date(f.data+"T12:00:00").getMonth();
         const groupId=uid();
-        const nd=safeData.map(m=>({...m,despesas:[...m.despesas]}));
+        let newAllYears={...allYearsData};
         let criadas=0;
+        let lastYear=currentYear,lastMonth=startMonth;
         for(let i=0;i<parcelas;i++){
-          const targetMonth=startMonth+i;
-          if(targetMonth>11) break; // só dentro do ano
-          nd[targetMonth].despesas.push({
-            id:uid(),
-            desc:f.desc,
-            valor:valorParcela,
-            valorTotal,
-            date:f.data,
-            ref:f.ref,
-            fornecedor:f.fornecedor,
-            recorrente:false,
-            formaPag:"parcelado",
-            parcelas,
-            parcelaNum:i+1,
-            parcelaGroupId:groupId,
-            meioPag:f.meioPag,
-            pago:f.pago,
-          });
+          let tm=startMonth+i;
+          let ty=currentYear;
+          while(tm>11){tm-=12;ty++;}
+          lastYear=ty;lastMonth=tm;
+          const yrKey=String(ty);
+          const baseYear=(Array.isArray(newAllYears[yrKey])&&newAllYears[yrKey].length===12)
+            ?newAllYears[yrKey].map(m=>({...m,despesas:[...m.despesas]})):emptyYear();
+          baseYear[tm].despesas.push({id:uid(),desc:f.desc,valor:valorParcela,valorTotal,date:f.data,ref:f.ref,fornecedor:f.fornecedor,recorrente:false,formaPag:"parcelado",parcelas,parcelaNum:i+1,parcelaGroupId:groupId,meioPag:f.meioPag,pago:f.pago});
+          newAllYears={...newAllYears,[yrKey]:baseYear};
           criadas++;
         }
-        setData(nd);
+        setAllYearsData(newAllYears);
         setDespForm(emptyDespForm(today));
         setShowModal(null);
-        showToast(`✅ ${criadas} parcelas distribuídas (${MONTHS[startMonth]} a ${MONTHS[Math.min(startMonth+parcelas-1,11)]})`);
+        const lastLabel=lastYear===currentYear?MONTHS[lastMonth]:`${MONTHS[lastMonth]}/${lastYear}`;
+        showToast(`✅ ${criadas} parcelas distribuídas (${MONTHS[startMonth]}/${currentYear} → ${lastLabel})`);
         return;
       }
       // ── RECORRENTE: distribui do mês de início até dezembro ───────
@@ -628,18 +621,23 @@ export default function App(){
       if(parcEmp>1){
         const startEmp=new Date(f.data+"T12:00:00").getMonth();
         const groupEmp=uid();
-        const nd=safeData.map(m=>({...m,emprestimos:[...m.emprestimos]}));
+        let newAllYearsEmp={...allYearsData};
         let criadasEmp=0;
         for(let i=0;i<parcEmp;i++){
-          const tm=startEmp+i;
-          if(tm>11) break;
-          nd[tm].emprestimos.push({id:uid(),desc:f.desc,valor:valParcEmp,valorTotal:valTotalEmp,date:f.data,ref:f.ref,parafem:f.parafem,parcelas:parcEmp,parcelaNum:i+1,parcelaGroupId:groupEmp,dataVenc1:f.dataVenc1,dataVencN:f.dataVencN,meioPag:f.meioPag,pago:f.pago});
+          let tm=startEmp+i;
+          let ty=currentYear;
+          while(tm>11){tm-=12;ty++;}
+          const yrKey=String(ty);
+          const baseYearEmp=(Array.isArray(newAllYearsEmp[yrKey])&&newAllYearsEmp[yrKey].length===12)
+            ?newAllYearsEmp[yrKey].map(m=>({...m,emprestimos:[...m.emprestimos]})):emptyYear();
+          baseYearEmp[tm].emprestimos.push({id:uid(),desc:f.desc,valor:valParcEmp,valorTotal:valTotalEmp,date:f.data,ref:f.ref,parafem:f.parafem,parcelas:parcEmp,parcelaNum:i+1,parcelaGroupId:groupEmp,dataVenc1:f.dataVenc1,dataVencN:f.dataVencN,meioPag:f.meioPag,pago:f.pago});
+          newAllYearsEmp={...newAllYearsEmp,[yrKey]:baseYearEmp};
           criadasEmp++;
         }
-        setData(nd);
+        setAllYearsData(newAllYearsEmp);
         setEmpForm(emptyEmpForm(today));
         setShowModal(null);
-        showToast(`✅ ${criadasEmp} parcelas de empréstimo distribuídas!`);
+        showToast(`✅ ${criadasEmp} parcelas de empréstimo distribuídas (multi-ano)!`);
         return;
       }
       item={id:uid(),desc:f.desc,valor:valParcEmp,valorTotal:valTotalEmp,date:f.data,ref:f.ref,parafem:f.parafem,valorParcela:valParcEmp,parcelas:parcEmp,dataVenc1:f.dataVenc1,dataVencN:f.dataVencN,meioPag:f.meioPag,pago:f.pago};
@@ -677,14 +675,16 @@ Cancelar = Remover APENAS este mês`);
 
     if(targetItem?.parcelaGroupId){
       const gid=targetItem.parcelaGroupId;
-      const totalGrupo=safeData.reduce((s,m)=>s+m[key].filter(x=>x.parcelaGroupId===gid).length,0);
+      // Busca em TODOS os anos
+      const totalGrupo=Object.values(allYearsData).reduce((s,yrData)=>s+(Array.isArray(yrData)?yrData.reduce((ss,m)=>ss+m[key].filter(x=>x.parcelaGroupId===gid).length,0):0),0);
       if(totalGrupo>1){
         const choice=confirm(`Parcela ${targetItem.parcelaNum}/${targetItem.parcelas} de "${targetItem.desc}".
 
-OK = Remover TODAS as parcelas
+OK = Remover TODAS as parcelas (todos os anos)
 Cancelar = Remover só esta parcela`);
         if(choice){
-          setData(d=>d.map(m=>({...m,[key]:m[key].filter(x=>x.parcelaGroupId!==gid)})));
+          // Remove de todos os anos
+          setAllYearsData(all=>Object.fromEntries(Object.entries(all).map(([yr,yrData])=>[yr,Array.isArray(yrData)?yrData.map(m=>({...m,[key]:m[key].filter(x=>x.parcelaGroupId!==gid)})):yrData])));
           showToast(`Todas as parcelas de "${targetItem.desc}" removidas.`);
           return;
         }
