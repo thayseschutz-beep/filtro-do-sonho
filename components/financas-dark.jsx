@@ -501,7 +501,7 @@ export default function App(){
   const anoCartTotal = yrMs.reduce((s,i)=>s+cartoes.reduce((ss,c)=>ss+getFat(c.id,CY,i),0),0);
   const anoCartAberto = yrMs.reduce((s,i)=>s+cartoes.reduce((ss,c)=>ss+(!isPago(c.id,CY,i)?getFat(c.id,CY,i):0),0),0);
   const anoSaldo = anoRecTotal - anoDespTotal - anoInvTotal - anoEmpTotal;
-  const anoSaldoReal = anoSaldo - anoCartAberto;
+  const anoSaldoReal = anoSaldo - anoCartTotal; // Saldo real = menos todas as faturas do ano
   const anoRecConf = safeData.reduce((s,m)=>s+sumArr(m.receitas.filter(x=>x.recebido)),0);
   const anoDespConf = safeData.reduce((s,m)=>s+sumArr(m.despesas.filter(x=>x.pago)),0);
   // meses com algum dado no ano
@@ -943,15 +943,47 @@ Cancelar = Dar baixa só nesta parcela`);
                 </div>}
 
                 <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:"12px",marginBottom:"12px"}}>
-                  <div style={{...card({marginBottom:0}),borderLeft:`4px solid ${T.purple}`}}>
-                    <p style={{fontSize:"11px",fontWeight:600,color:T.textSub,textTransform:"uppercase",letterSpacing:"0.06em",margin:"0 0 4px"}}>SALDO ORÇAMENTO {CY}</p>
-                    <p style={{fontSize:"26px",fontWeight:700,color:anoSaldo>=0?T.purple:T.red,margin:"0 0 4px"}}>{fmt(anoSaldo)}</p>
-                    <p style={{fontSize:"12px",color:T.textSub,margin:0}}>Rec − Desp − Invest − Emp</p>
+                  {/* Saldo Orçamento — Entradas vs Saídas */}
+                  <div style={{...card({marginBottom:0}),borderLeft:`4px solid ${anoSaldo>=0?T.green:T.red}`}}>
+                    <p style={{fontSize:"11px",fontWeight:600,color:T.textSub,textTransform:"uppercase",letterSpacing:"0.06em",margin:"0 0 8px"}}>SALDO ORÇAMENTO {CY}</p>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"10px"}}>
+                      <div>
+                        <p style={{fontSize:"10px",color:T.textMuted,margin:"0 0 2px",textTransform:"uppercase"}}>Total Entradas</p>
+                        <p style={{fontSize:"18px",fontWeight:700,color:T.green,margin:0}}>{fmt(anoRecTotal)}</p>
+                      </div>
+                      <span style={{fontSize:"22px",color:T.textMuted,marginTop:"10px"}}>−</span>
+                      <div style={{textAlign:"right"}}>
+                        <p style={{fontSize:"10px",color:T.textMuted,margin:"0 0 2px",textTransform:"uppercase"}}>Total Saídas</p>
+                        <p style={{fontSize:"18px",fontWeight:700,color:T.red,margin:0}}>{fmt(anoDespTotal+anoInvTotal+anoEmpTotal)}</p>
+                        <p style={{fontSize:"10px",color:T.textMuted,margin:"2px 0 0"}}>Desp {fmt(anoDespTotal)} · Inv {fmt(anoInvTotal)} · Emp {fmt(anoEmpTotal)}</p>
+                      </div>
+                    </div>
+                    <div style={{borderTop:`2px solid ${anoSaldo>=0?T.green:T.red}`,paddingTop:"8px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <span style={{fontSize:"12px",fontWeight:600,color:T.textSub}}>= Saldo</span>
+                      <span style={{fontSize:"26px",fontWeight:700,color:anoSaldo>=0?T.green:T.red}}>{fmt(anoSaldo)}</span>
+                    </div>
                   </div>
-                  <div style={{...card({marginBottom:0}),borderLeft:`4px solid ${anoSaldoReal>=0?T.green:T.red}`}}>
-                    <p style={{fontSize:"11px",fontWeight:600,color:T.textSub,textTransform:"uppercase",letterSpacing:"0.06em",margin:"0 0 4px"}}>SALDO REAL {CY}</p>
-                    <p style={{fontSize:"26px",fontWeight:700,color:anoSaldoReal>=0?T.green:T.red,margin:"0 0 4px"}}>{fmt(anoSaldoReal)}</p>
-                    <p style={{fontSize:"12px",color:T.textSub,margin:0}}>{anoCartAberto>0?`Inclui ${fmt(anoCartAberto)} faturas em aberto`:"Faturas em dia ✓"}</p>
+                  {/* Saldo Real — inclui cartões */}
+                  <div style={{...card({marginBottom:0}),borderLeft:`4px solid ${anoSaldoReal>=0?T.blue:T.red}`}}>
+                    <p style={{fontSize:"11px",fontWeight:600,color:T.textSub,textTransform:"uppercase",letterSpacing:"0.06em",margin:"0 0 8px"}}>SALDO REAL {CY} (com cartões)</p>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"10px"}}>
+                      <div>
+                        <p style={{fontSize:"10px",color:T.textMuted,margin:"0 0 2px",textTransform:"uppercase"}}>Total Entradas</p>
+                        <p style={{fontSize:"18px",fontWeight:700,color:T.green,margin:0}}>{fmt(anoRecTotal)}</p>
+                      </div>
+                      <span style={{fontSize:"22px",color:T.textMuted,marginTop:"10px"}}>−</span>
+                      <div style={{textAlign:"right"}}>
+                        <p style={{fontSize:"10px",color:T.textMuted,margin:"0 0 2px",textTransform:"uppercase"}}>Total Saídas + Cartões</p>
+                        <p style={{fontSize:"18px",fontWeight:700,color:T.red,margin:0}}>{fmt(anoDespTotal+anoInvTotal+anoEmpTotal+anoCartTotal)}</p>
+                        <p style={{fontSize:"10px",color:T.textMuted,margin:"2px 0 0"}}>
+                          {anoCartAberto>0?<span style={{color:T.amber}}>⚠ {fmt(anoCartAberto)} faturas em aberto</span>:<span style={{color:T.green}}>✓ Faturas em dia</span>}
+                        </p>
+                      </div>
+                    </div>
+                    <div style={{borderTop:`2px solid ${anoSaldoReal>=0?T.blue:T.red}`,paddingTop:"8px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <span style={{fontSize:"12px",fontWeight:600,color:T.textSub}}>= Saldo Real</span>
+                      <span style={{fontSize:"26px",fontWeight:700,color:anoSaldoReal>=0?T.blue:T.red}}>{fmt(anoSaldoReal)}</span>
+                    </div>
                   </div>
                 </div>
 
