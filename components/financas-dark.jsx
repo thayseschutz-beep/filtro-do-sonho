@@ -320,6 +320,7 @@ export default function App(){
   const [pagForm, setPagForm] = useState({tipo:"total", valor:"", data:"", obs:""});
   const [editUso, setEditUso] = useState(null); // for editing a credit card purchase
   const [meiData, setMeiData] = useState(emptyMei());
+  const [searchQuery, setSearchQuery] = useState("");
   const [meiTab, setMeiTab] = useState("lancamentos");
   const [meiViewYear, setMeiViewYear] = useState(new Date().getFullYear());
   const [meiVisualMonth, setMeiVisualMonth] = useState(new Date().toISOString().slice(0,7));
@@ -817,7 +818,7 @@ Cancelar = Dar baixa só nesta parcela`);
   };
 
   // nav
-  const navItems=[{key:"dashboard",icon:"📊",label:"Dashboard"},{key:"lancamentos",icon:"✏️",label:"Lançamentos"},{key:"relatorio",icon:"📈",label:"Relatório"},{key:"cartoes",icon:"💳",label:"Cartões"},{key:"cadastros",icon:"🗂️",label:"Cadastros"},{key:"mei",icon:"🏢",label:"MEI"},{key:"sincronizar",icon:"🔄",label:"Sincronizar"}];
+  const navItems=[{key:"dashboard",icon:"📊",label:"Dashboard"},{key:"lancamentos",icon:"✏️",label:"Lançamentos"},{key:"buscar",icon:"🔍",label:"Buscar"},{key:"relatorio",icon:"📈",label:"Relatório"},{key:"cartoes",icon:"💳",label:"Cartões"},{key:"cadastros",icon:"🗂️",label:"Cadastros"},{key:"mei",icon:"🏢",label:"MEI"},{key:"sincronizar",icon:"🔄",label:"Sincronizar"}];
   const cardSubNav=[["cadastro","📋","Cadastro"],["uso","🛒","Uso de Cartões"],["faturas","📄","Faturas"],["relatorio_c","📊","Relatório"],["dashcard","🖥️","Dashboard"]];
   const cadSubNav=[["bancos","🏦","Bancos"],["fornecedores","🏢","Fornecedores"],["pessoas","👤","Pessoas"]];
   const lancTabs=[{key:"receita",label:"📥 Receitas",col:T.green},{key:"despesa",label:"📤 Despesas",col:T.red},{key:"investimento",label:"💎 Investimentos",col:T.blue},{key:"emprestimo",label:"🔄 Empréstimos",col:T.amber}];
@@ -873,7 +874,7 @@ Cancelar = Dar baixa só nesta parcela`);
             </h1>
             <p style={{color:T.textSub,fontSize:"13px",margin:"2px 0 0"}}>GreenMind — Financial Planning • {CY}</p>
           </div>
-          {activeSection!=="cartoes"&&activeSection!=="cadastros"&&activeSection!=="sincronizar"&&activeSection!=="mei"&&(
+          {activeSection!=="cartoes"&&activeSection!=="cadastros"&&activeSection!=="sincronizar"&&activeSection!=="mei"&&activeSection!=="buscar"&&(
             <div style={{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}}>
               {!isMobile&&<div style={{display:"flex",background:T.surfaceAlt,borderRadius:"10px",padding:"3px",border:`1px solid ${T.border}`,gap:"2px"}}>
                 {["mes","ano"].map(v=><button key={v} style={toggleB(view===v)} onClick={()=>setView(v)}>{v==="mes"?"Mês":"Ano"}</button>)}
@@ -2319,6 +2320,184 @@ Cancelar = Dar baixa só nesta parcela`);
           );
         })()}
 
+        {/* ── BUSCAR ── */}
+        {activeSection==="buscar"&&(()=>{
+          // Coleta todos os itens de todos os anos e meses
+          const allItems = [];
+          Object.entries(allYearsData).forEach(([yr, meses]) => {
+            if(!Array.isArray(meses)) return;
+            meses.forEach((m, mi) => {
+              ["receitas","despesas","investimentos","emprestimos"].forEach(tipo => {
+                (m[tipo]||[]).forEach(item => {
+                  allItems.push({ ...item, tipo, year: Number(yr), monthIdx: mi, monthName: MONTHS[mi] });
+                });
+              });
+            });
+          });
+
+          // Agrupa por groupId (parcelado/recorrente) ou por item individual
+          const groups = {};
+          allItems.forEach(item => {
+            const gid = item.parcelaGroupId || item.recorrenteGroupId || item.id;
+            if(!groups[gid]) groups[gid] = { gid, items: [], tipo: item.tipo, isParcelado: !!item.parcelaGroupId, isRecorrente: !!item.recorrenteGroupId };
+            groups[gid].items.push(item);
+          });
+
+          // Filtro de busca
+          const q = searchQuery.toLowerCase().trim();
+          const filtered = Object.values(groups).filter(g => {
+            if(!q) return false;
+            const ref = g.items[0];
+            return (
+              (ref.desc||"").toLowerCase().includes(q) ||
+              (ref.fornecedor||"").toLowerCase().includes(q) ||
+              (ref.cliente||"").toLowerCase().includes(q) ||
+              (ref.tomador||"").toLowerCase().includes(q) ||
+              (ref.prestador||"").toLowerCase().includes(q) ||
+              (ref.parafem||"").toLowerCase().includes(q) ||
+              (ref.ref||"").toLowerCase().includes(q) ||
+              (ref.banco||"").toLowerCase().includes(q)
+            );
+          }).sort((a,b) => {
+            const da = a.items[0]; const db = b.items[0];
+            return (db.year - da.year) || (db.monthIdx - da.monthIdx);
+          });
+
+          const tipoLabel = { receitas:"Receita", despesas:"Despesa", investimentos:"Investimento", emprestimos:"Empréstimo" };
+          const tipoCol = { receitas:T.green, despesas:T.red, investimentos:T.blue, emprestimos:T.amber };
+          const statusField = { receitas:"recebido", despesas:"pago", investimentos:"investido", emprestimos:"pago" };
+
+          return (
+            <div>
+              {/* Search bar */}
+              <div style={{...card({marginBottom:"16px"}),padding:"16px 20px"}}>
+                <p style={{fontSize:"13px",color:T.textSub,marginBottom:"10px"}}>🔍 Pesquise por descrição, fornecedor, cliente, banco, referência...</p>
+                <input
+                  style={{...inpS,fontSize:"15px",padding:"12px 16px"}}
+                  placeholder="Ex: Casas da Água, Caixa, Maquiagens, Nubank..."
+                  value={searchQuery}
+                  onChange={e=>setSearchQuery(e.target.value)}
+                  autoFocus
+                />
+                {searchQuery&&<p style={{fontSize:"12px",color:T.textSub,marginTop:"8px"}}>{filtered.length} resultado(s) encontrado(s)</p>}
+              </div>
+
+              {/* Empty state */}
+              {!searchQuery&&(
+                <div style={{...card(),textAlign:"center",padding:"40px 20px"}}>
+                  <p style={{fontSize:"40px",marginBottom:"12px"}}>🔍</p>
+                  <p style={{fontSize:"15px",fontWeight:600,color:T.text,marginBottom:"6px"}}>Busca de Lançamentos</p>
+                  <p style={{fontSize:"13px",color:T.textSub,maxWidth:"400px",margin:"0 auto"}}>Digite o nome de uma despesa, fornecedor, cliente ou referência para ver o ciclo completo de pagamentos — parcelas pagas, pendentes e quanto falta.</p>
+                </div>
+              )}
+
+              {/* No results */}
+              {searchQuery&&filtered.length===0&&(
+                <div style={{...card(),textAlign:"center",padding:"32px 20px"}}>
+                  <p style={{fontSize:"32px",marginBottom:"8px"}}>😶</p>
+                  <p style={{fontSize:"14px",color:T.textSub}}>Nenhum resultado para <strong>"{searchQuery}"</strong></p>
+                </div>
+              )}
+
+              {/* Results */}
+              {filtered.map(group => {
+                const ref = group.items[0];
+                const col = tipoCol[group.tipo] || T.purple;
+                const sf = statusField[group.tipo] || "pago";
+                const sorted = [...group.items].sort((a,b) => (a.year-b.year)||(a.monthIdx-b.monthIdx)||(a.parcelaNum||0)-(b.parcelaNum||0));
+                const totalPago = sorted.filter(i=>i[sf]).length;
+                const totalPendente = sorted.length - totalPago;
+                const valorTotal = group.isParcelado ? (ref.valorTotal||ref.valor*sorted.length) : sorted.reduce((s,i)=>s+i.valor,0);
+                const valorPago = sorted.filter(i=>i[sf]).reduce((s,i)=>s+i.valor,0);
+                const valorPendente = sorted.filter(i=>!i[sf]).reduce((s,i)=>s+i.valor,0);
+                const ultimaParcela = sorted[sorted.length-1];
+                const proximaPendente = sorted.find(i=>!i[sf]);
+
+                return (
+                  <div key={group.gid} style={{...card(),border:`1px solid ${col}25`,marginBottom:"12px"}}>
+                    {/* Header */}
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"14px",flexWrap:"wrap",gap:"8px"}}>
+                      <div>
+                        <div style={{display:"flex",alignItems:"center",gap:"8px",flexWrap:"wrap"}}>
+                          <h3 style={{fontSize:"15px",fontWeight:700,color:T.text,margin:0}}>{ref.desc}</h3>
+                          <span style={chip(col)}>{tipoLabel[group.tipo]}</span>
+                          {group.isParcelado&&<span style={{...chip(T.amber),fontSize:"10px"}}>🔢 Parcelado</span>}
+                          {group.isRecorrente&&<span style={{...chip(T.purple),fontSize:"10px"}}>🔁 Recorrente</span>}
+                        </div>
+                        <div style={{display:"flex",gap:"10px",marginTop:"4px",flexWrap:"wrap"}}>
+                          {ref.fornecedor&&<span style={{fontSize:"12px",color:T.textSub}}>🏢 {ref.fornecedor}</span>}
+                          {ref.cliente&&<span style={{fontSize:"12px",color:T.textSub}}>👤 {ref.cliente}</span>}
+                          {ref.parafem&&<span style={{fontSize:"12px",color:T.textSub}}>↔ {ref.parafem}</span>}
+                          {ref.banco&&<span style={{fontSize:"12px",color:T.textSub}}>🏦 {ref.banco}</span>}
+                          {ref.meioPag&&<span style={{fontSize:"12px",color:T.blue}}>{({pix:"PIX",dinheiro:"Dinheiro",cheque:"Cheque",boleto:"Boleto",cartao:"Cartão"})[ref.meioPag]||ref.meioPag}</span>}
+                        </div>
+                      </div>
+                      <div style={{textAlign:"right"}}>
+                        <p style={{fontSize:"20px",fontWeight:700,color:col,margin:0}}>{fmt(valorTotal)}</p>
+                        <p style={{fontSize:"11px",color:T.textSub,margin:0}}>valor total</p>
+                      </div>
+                    </div>
+
+                    {/* Métricas */}
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"8px",marginBottom:"14px"}}>
+                      <div style={{background:T.greenLight,borderRadius:"8px",padding:"10px",border:"1px solid #BBF7D0"}}>
+                        <p style={{fontSize:"10px",color:T.green,fontWeight:600,textTransform:"uppercase",margin:"0 0 3px"}}>✓ {sf==="recebido"?"Recebido":"Pago"}</p>
+                        <p style={{fontSize:"16px",fontWeight:700,color:T.green,margin:0}}>{fmt(valorPago)}</p>
+                        <p style={{fontSize:"11px",color:T.textSub,margin:"2px 0 0"}}>{totalPago} de {sorted.length} {group.isParcelado?"parcelas":"meses"}</p>
+                      </div>
+                      <div style={{background:totalPendente>0?T.amberLight:T.greenLight,borderRadius:"8px",padding:"10px",border:`1px solid ${totalPendente>0?"#FDE68A":"#BBF7D0"}`}}>
+                        <p style={{fontSize:"10px",color:totalPendente>0?T.amber:T.green,fontWeight:600,textTransform:"uppercase",margin:"0 0 3px"}}>{totalPendente>0?"⏳ Pendente":"✓ Quitado"}</p>
+                        <p style={{fontSize:"16px",fontWeight:700,color:totalPendente>0?T.amber:T.green,margin:0}}>{totalPendente>0?fmt(valorPendente):"R$ 0,00"}</p>
+                        <p style={{fontSize:"11px",color:T.textSub,margin:"2px 0 0"}}>{totalPendente} restante(s)</p>
+                      </div>
+                      <div style={{background:T.surfaceAlt,borderRadius:"8px",padding:"10px",border:`1px solid ${T.border}`}}>
+                        <p style={{fontSize:"10px",color:T.textSub,fontWeight:600,textTransform:"uppercase",margin:"0 0 3px"}}>📅 Período</p>
+                        <p style={{fontSize:"12px",fontWeight:600,color:T.text,margin:0}}>{sorted[0].monthName}/{sorted[0].year}</p>
+                        <p style={{fontSize:"11px",color:T.textSub,margin:"1px 0 0"}}>até {ultimaParcela.monthName}/{ultimaParcela.year}</p>
+                      </div>
+                    </div>
+
+                    {/* Barra de progresso */}
+                    <div style={{marginBottom:"12px"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",fontSize:"12px",marginBottom:"4px"}}>
+                        <span style={{color:T.textSub}}>Progresso</span>
+                        <span style={{color:col,fontWeight:600}}>{sorted.length>0?Math.round((totalPago/sorted.length)*100):0}% {sf==="recebido"?"recebido":"pago"}</span>
+                      </div>
+                      <div style={{height:8,background:T.surfaceAlt,borderRadius:6,border:`1px solid ${T.border}`,overflow:"hidden"}}>
+                        <div style={{height:8,width:`${sorted.length>0?(totalPago/sorted.length)*100:0}%`,background:totalPendente===0?T.green:col,borderRadius:6,transition:"width 0.5s"}}/>
+                      </div>
+                      {proximaPendente&&<p style={{fontSize:"11px",color:T.amber,margin:"5px 0 0"}}>⏰ Próxima pendente: <strong>{proximaPendente.monthName}/{proximaPendente.year}</strong> — {fmt(proximaPendente.valor)}</p>}
+                      {totalPendente===0&&<p style={{fontSize:"11px",color:T.green,margin:"5px 0 0"}}>✅ Totalmente {sf==="recebido"?"recebido":"quitado"}!</p>}
+                    </div>
+
+                    {/* Timeline de parcelas */}
+                    <div>
+                      <p style={{fontSize:"11px",fontWeight:600,color:T.textSub,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"8px"}}>Timeline</p>
+                      <div style={{display:"flex",gap:"4px",flexWrap:"wrap"}}>
+                        {sorted.map((item,idx) => {
+                          const isPg = !!item[sf];
+                          return (
+                            <div key={item.id} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"2px",minWidth:"52px"}}>
+                              <div style={{width:"44px",height:"44px",borderRadius:"10px",background:isPg?T.greenLight:item.year===currentYear&&item.monthIdx===currentMonth?"#FFFBEB":T.surfaceAlt,border:`1.5px solid ${isPg?"#BBF7D0":item.year===currentYear&&item.monthIdx===currentMonth?T.amber:T.border}`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"pointer"}}
+                                onClick={()=>{setCurrentYear(item.year);setCurrentMonth(item.monthIdx);setActiveSection("lancamentos");setLancTab(group.tipo==="receitas"?"receita":group.tipo==="despesas"?"despesa":group.tipo==="investimentos"?"investimento":"emprestimo");}}>
+                                <span style={{fontSize:"9px",fontWeight:600,color:isPg?T.green:T.textSub}}>{MS[item.monthIdx]}</span>
+                                <span style={{fontSize:"8px",color:T.textMuted}}>{item.year}</span>
+                                <span style={{fontSize:"13px"}}>{isPg?"✓":"○"}</span>
+                              </div>
+                              {group.isParcelado&&<span style={{fontSize:"9px",color:T.textMuted}}>{item.parcelaNum}/{item.parcelas}</span>}
+                              <span style={{fontSize:"9px",color:col,fontWeight:600}}>{fmt(item.valor).replace("R$","").trim()}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+
         {/* ── SINCRONIZAR ── */}
         {activeSection==="sincronizar"&&(
           <div style={{maxWidth:"680px"}}>
@@ -2551,7 +2730,7 @@ Cancelar = Dar baixa só nesta parcela`);
       {/* MOBILE BOTTOM NAV */}
       {isMobile&&(
         <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:200,background:T.surface,borderTop:`1px solid ${T.border}`,display:"flex",justifyContent:"space-around",padding:"8px 0 12px",boxShadow:"0 -2px 10px rgba(0,0,0,0.08)"}}>
-          {[{key:"dashboard",icon:"📊",label:"Início"},{key:"lancamentos",icon:"✏️",label:"Lançar"},{key:"cartoes",icon:"💳",label:"Cartões"},{key:"mei",icon:"🏢",label:"MEI"},{key:"sincronizar",icon:"🔄",label:"Sync"}].map(n=>(
+          {[{key:"dashboard",icon:"📊",label:"Início"},{key:"lancamentos",icon:"✏️",label:"Lançar"},{key:"buscar",icon:"🔍",label:"Buscar"},{key:"cartoes",icon:"💳",label:"Cartões"},{key:"mei",icon:"🏢",label:"MEI"}].map(n=>(
             <div key={n.key} onClick={()=>setActiveSection(n.key)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"3px",cursor:"pointer",minWidth:"56px"}}>
               <span style={{fontSize:"20px"}}>{n.icon}</span>
               <span style={{fontSize:"9px",fontWeight:600,color:activeSection===n.key?T.purple:T.textMuted}}>{n.label}</span>
