@@ -1729,13 +1729,89 @@ Cancelar = Dar baixa só nesta parcela`);
           const dataGeracao = new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
           const mesLabel = `${MONTHS[mesIdx]}/${relAno}`;
 
+          const buildReportHTML = () => {
+            const fmt2 = (v) => new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(v||0);
+            const mesLabel = `${MONTHS[mesIdx]}/${relAno}`;
+            const titulo = relTipo==="mensal"?`Fechamento Mensal — ${mesLabel}`:relTipo==="fatura"?`Fatura ${cartaoSel?.nome||""} — ${mesLabel}`:`Extrato: ${relFiltroTexto} — ${mesLabel}`;
+            const css = `
+              *{box-sizing:border-box;margin:0;padding:0}
+              body{font-family:Arial,sans-serif;font-size:12px;color:#111827;background:#fff;padding:24px}
+              h1{font-size:18px;color:#fff}.header{background:linear-gradient(135deg,#166534,#22C55E);color:#fff;padding:16px 20px;border-radius:8px 8px 0 0;display:flex;justify-content:space-between;align-items:center;margin-bottom:0}
+              .header-right{text-align:right;font-size:12px}.header-right p{margin:3px 0}
+              .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px 0}
+              .card{border-radius:8px;padding:12px;border:1px solid #e5e7eb}.card-label{font-size:9px;font-weight:700;text-transform:uppercase;margin-bottom:4px;letter-spacing:0.05em}.card-value{font-size:18px;font-weight:700}.card-sub{font-size:9px;margin-top:3px}
+              table{width:100%;border-collapse:collapse;margin:8px 0;font-size:11px}
+              th{padding:7px 10px;text-align:left;font-weight:600;border-bottom:2px solid}
+              td{padding:6px 10px;border-bottom:1px solid #f3f4f6}
+              tr:nth-child(even){background:#f9fafb}
+              .th-right{text-align:right}.td-right{text-align:right}
+              .section-header{padding:8px 14px;border-radius:6px 6px 0 0;border-bottom:2px solid;display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:13px;margin-top:16px}
+              .badge{padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;display:inline-block}
+              .footer-bar{border-top:1px solid #e5e7eb;margin-top:20px;padding-top:12px;display:flex;justify-content:space-between;font-size:10px;color:#9ca3af}
+              .saldo-box{border-radius:8px;padding:12px 18px;display:flex;justify-content:space-between;align-items:center;margin-top:14px;border:2px solid}
+              .tfoot-row{background:#f3f4f6}
+              @media print{@page{margin:12mm}body{padding:0}}
+            `;
+            let body = `<div class="header"><div><h1>🌱 GreenMind</h1><p style="font-size:10px;opacity:0.85;margin-top:3px">Financial Planning</p></div><div class="header-right"><p><strong>${titulo}</strong></p><p style="opacity:0.8;font-size:10px">${dataGeracao}</p></div></div>`;
+
+            if(relTipo==="mensal"){
+              body += `<div class="cards">
+                <div class="card" style="background:#dcfce7;border-color:#16a34a30"><div class="card-label" style="color:#16a34a">↑ Receitas</div><div class="card-value" style="color:#16a34a">${fmt2(recTotal)}</div></div>
+                <div class="card" style="background:#fee2e2;border-color:#dc262630"><div class="card-label" style="color:#dc2626">↓ Despesas</div><div class="card-value" style="color:#dc2626">${fmt2(despTotal+empTotal)}</div></div>
+                <div class="card" style="background:#fef3c7;border-color:#d9780630"><div class="card-label" style="color:#d97806">💳 Cartões</div><div class="card-value" style="color:#d97806">${fmt2(fatMes)}</div>${fatAberto>0?`<div class="card-sub" style="color:#d97806">${fmt2(fatAberto)} em aberto</div>`:""}</div>
+                <div class="card" style="background:${saldoMes>=0?"#eff6ff":"#fee2e2"};border-color:${saldoMes>=0?"#1d4ed830":"#dc262630"}"><div class="card-label" style="color:${saldoMes>=0?"#1d4ed8":"#dc2626"}">= Saldo</div><div class="card-value" style="color:${saldoMes>=0?"#1d4ed8":"#dc2626"}">${fmt2(saldoMes)}</div></div>
+              </div>`;
+              if(mesData.receitas.length>0){
+                body+=`<div class="section-header" style="background:#dcfce7;border-color:#16a34a;color:#14532d"><span>📥 Receitas</span><span>${fmt2(recTotal)}</span></div>
+                <table><thead><tr style="background:#f0fdf4"><th style="color:#166534;border-color:#bbf7d0">Descrição</th><th style="color:#166534;border-color:#bbf7d0">Cliente</th><th style="color:#166534;border-color:#bbf7d0">Data</th><th style="color:#166534;border-color:#bbf7d0">Forma Rec.</th><th style="color:#166534;border-color:#bbf7d0">Status</th><th class="th-right" style="color:#166534;border-color:#bbf7d0">Valor</th></tr></thead><tbody>`;
+                mesData.receitas.forEach(r=>{ body+=`<tr><td>${r.desc||""}</td><td>${r.cliente||"—"}</td><td>${r.date||""}</td><td>${({pix:"PIX",dinheiro:"Dinheiro",ted:"TED",cheque:"Cheque"})[r.formaRec]||"—"}</td><td><span class="badge" style="background:${r.recebido?"#dcfce7":"#fef3c7"};color:${r.recebido?"#16a34a":"#d97806"}">${r.recebido?"✓ Recebido":"Pendente"}</span></td><td class="td-right" style="color:#16a34a;font-weight:600">${fmt2(r.valor)}</td></tr>`; });
+                body+=`</tbody><tfoot><tr class="tfoot-row"><td colspan="5" style="font-weight:700;color:#14532d">Total Receitas</td><td class="td-right" style="font-weight:700;color:#16a34a">${fmt2(recTotal)}</td></tr></tfoot></table>`;
+              }
+              if(mesData.despesas.length>0){
+                body+=`<div class="section-header" style="background:#fee2e2;border-color:#dc2626;color:#7f1d1d"><span>📤 Despesas</span><span>${fmt2(despTotal)}</span></div>
+                <table><thead><tr style="background:#fff5f5"><th style="color:#991b1b;border-color:#fecaca">Descrição</th><th style="color:#991b1b;border-color:#fecaca">Fornecedor</th><th style="color:#991b1b;border-color:#fecaca">Data</th><th style="color:#991b1b;border-color:#fecaca">Meio Pag.</th><th style="color:#991b1b;border-color:#fecaca">Parcela</th><th style="color:#991b1b;border-color:#fecaca">Status</th><th class="th-right" style="color:#991b1b;border-color:#fecaca">Valor</th></tr></thead><tbody>`;
+                mesData.despesas.forEach(d=>{ body+=`<tr><td>${d.desc||""}</td><td>${d.fornecedor||"—"}</td><td>${d.date||""}</td><td>${({pix:"PIX",dinheiro:"Dinheiro",cheque:"Cheque",boleto:"Boleto",cartao:"Cartão"})[d.meioPag]||"—"}</td><td style="color:#d97806">${d.parcelaNum?`${d.parcelaNum}/${d.parcelas}`:"—"}</td><td><span class="badge" style="background:${d.pago?"#dcfce7":"#fef3c7"};color:${d.pago?"#16a34a":"#d97806"}">${d.pago?"✓ Pago":"Pendente"}</span></td><td class="td-right" style="color:#dc2626;font-weight:600">${fmt2(d.valor)}</td></tr>`; });
+                body+=`</tbody><tfoot><tr class="tfoot-row"><td colspan="6" style="font-weight:700;color:#7f1d1d">Total Despesas</td><td class="td-right" style="font-weight:700;color:#dc2626">${fmt2(despTotal)}</td></tr></tfoot></table>`;
+              }
+              if(fatMes>0){
+                body+=`<div class="section-header" style="background:#fef3c7;border-color:#d97806;color:#78350f"><span>💳 Faturas de Cartão</span><span>${fmt2(fatMes)}</span></div>
+                <table><thead><tr style="background:#fffbeb"><th style="color:#92400e;border-color:#fde68a">Cartão</th><th style="color:#92400e;border-color:#fde68a">Total Fatura</th><th style="color:#92400e;border-color:#fde68a">Status</th></tr></thead><tbody>`;
+                cartoes.forEach(c=>{const v=getFat(c.id,relAno,mesIdx);const pg=isPago(c.id,relAno,mesIdx);if(v>0)body+=`<tr><td style="font-weight:600">${c.nome}</td><td style="color:#d97806;font-weight:600">${fmt2(v)}</td><td><span class="badge" style="background:${pg?"#dcfce7":"#fee2e2"};color:${pg?"#16a34a":"#dc2626"}">${pg?"✓ Pago":"Em aberto"}</span></td></tr>`;});
+                body+=`</tbody></table>`;
+              }
+              body+=`<div class="saldo-box" style="background:${saldoMes>=0?"#eff6ff":"#fef2f2"};border-color:${saldoMes>=0?"#bfdbfe":"#fecaca"}"><span style="font-weight:600;font-size:14px;color:${saldoMes>=0?"#1e3a8a":"#7f1d1d"}">Saldo Final — ${mesLabel}</span><span style="font-size:24px;font-weight:700;color:${saldoMes>=0?"#1d4ed8":"#dc2626"}">${fmt2(saldoMes)}</span></div>`;
+            }
+
+            if(relTipo==="fatura"&&relCartaoId){
+              body+=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0">
+                <div class="card" style="background:#f9fafb"><div class="card-label">CARTÃO</div><div style="font-weight:700;font-size:14px">${cartaoSel?.nome||"—"}</div></div>
+                <div class="card" style="background:#f9fafb"><div class="card-label">VENCIMENTO</div><div style="font-weight:700;font-size:14px">Dia ${cartaoSel?.diaPagamento||"—"}</div></div>
+                <div class="card" style="background:#fef3c7;border-color:#d9780630"><div class="card-label" style="color:#d97806">TOTAL FATURA</div><div style="font-weight:700;font-size:18px;color:#d97806">${fmt2(fatCartaoTotal)}</div></div>
+                <div class="card" style="background:#f9fafb"><div class="card-label">PARCELAS</div><div style="font-weight:700;font-size:14px">${comprasCartao.length} compras</div></div>
+                <div class="card" style="background:#f9fafb"><div class="card-label">LIMITE</div><div style="font-weight:700;font-size:14px">${cartaoSel?.limite>0?fmt2(cartaoSel.limite):"Não informado"}</div></div>
+                <div class="card" style="background:${fatCartaoPaga?"#dcfce7":"#fee2e2"};border-color:${fatCartaoPaga?"#16a34a30":"#dc262630"}"><div class="card-label" style="color:${fatCartaoPaga?"#16a34a":"#dc2626"}">STATUS</div><div style="font-weight:700;font-size:14px;color:${fatCartaoPaga?"#16a34a":"#dc2626"}">${fatCartaoPaga?"✓ PAGO":"EM ABERTO"}</div></div>
+              </div>
+              <table><thead><tr style="background:#fef3c7"><th style="color:#92400e;border-color:#d97806">Data</th><th style="color:#92400e;border-color:#d97806">Descrição</th><th style="color:#92400e;border-color:#d97806">Parcela</th><th class="th-right" style="color:#92400e;border-color:#d97806">Valor Parcela</th><th class="th-right" style="color:#92400e;border-color:#d97806">Valor Total</th></tr></thead><tbody>`;
+              comprasCartao.forEach(u=>{const np=getInstMonths(u).findIndex(im=>im.year===relAno&&im.month===mesIdx)+1;body+=`<tr><td>${u.data||""}</td><td style="font-weight:500">${u.descricao||""}</td><td style="color:#d97806">${np}/${u.parcelas}x</td><td class="td-right" style="color:#d97806;font-weight:600">${fmt2(u.valorParcela)}</td><td class="td-right" style="color:#6b7280">${fmt2(u.valor)}</td></tr>`;});
+              body+=`</tbody><tfoot><tr class="tfoot-row"><td colspan="3" style="font-weight:700;color:#78350f">TOTAL DA FATURA</td><td colspan="2" class="td-right" style="font-weight:700;font-size:16px;color:#d97806">${fmt2(fatCartaoTotal)}</td></tr></tfoot></table>
+              <div class="saldo-box" style="background:${fatCartaoPaga?"#dcfce7":"#fee2e2"};border-color:${fatCartaoPaga?"#16a34a":"#dc2626"}"><span style="font-weight:600;color:${fatCartaoPaga?"#14532d":"#7f1d1d"}">Status do Pagamento</span><span style="font-size:18px;font-weight:700;color:${fatCartaoPaga?"#16a34a":"#dc2626"}">${fatCartaoPaga?"✓ FATURA PAGA":"⚠ FATURA EM ABERTO"}</span></div>`;
+            }
+
+            if(relTipo==="filtro"&&itensFiltrados.length>0){
+              body+=`<table style="margin-top:16px"><thead><tr style="background:#f3f4f6"><th style="border-color:#e5e7eb">Tipo</th><th style="border-color:#e5e7eb">Descrição</th><th style="border-color:#e5e7eb">Fornecedor/Cliente</th><th style="border-color:#e5e7eb">Data</th><th style="border-color:#e5e7eb">Parcela</th><th style="border-color:#e5e7eb">Status</th><th class="th-right" style="border-color:#e5e7eb">Valor</th></tr></thead><tbody>`;
+              itensFiltrados.forEach(item=>{ body+=`<tr><td><span class="badge" style="background:${item._col}20;color:${item._col}">${item._tipo}</span></td><td style="font-weight:500">${item.desc||""}</td><td style="color:#6b7280">${item.fornecedor||item.cliente||item.parafem||"—"}</td><td>${item.date||""}</td><td style="color:#d97806">${item.parcelaNum?`${item.parcelaNum}/${item.parcelas}`:"—"}</td><td><span class="badge" style="background:${(item.pago||item.recebido||item.investido)?"#dcfce7":"#fef3c7"};color:${(item.pago||item.recebido||item.investido)?"#16a34a":"#d97806"}">${(item.pago||item.recebido||item.investido)?"✓ Pago":"Pendente"}</span></td><td class="td-right" style="font-weight:600;color:${item._col}">${fmt2(item.valor)}</td></tr>`; });
+              body+=`</tbody><tfoot><tr class="tfoot-row"><td colspan="6" style="font-weight:700">Total</td><td class="td-right" style="font-weight:700;font-size:14px">${fmt2(itensFiltrados.reduce((s,x)=>s+x.valor,0))}</td></tr></tfoot></table>`;
+            }
+
+            body+=`<div class="footer-bar"><span>GreenMind — Financial Planning</span><span>${dataGeracao}</span><span>Confidencial</span></div>`;
+            return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${titulo}</title><style>${css}</style></head><body>${body}<script>window.onload=function(){window.print();}<\/script></body></html>`;
+          };
+
           const printReport = () => {
-            const style = document.createElement("style");
-            style.id = "__print_style";
-            style.innerHTML = `@media print { body > * { display: none !important; } #relatorio-print { display: block !important; position: fixed; top: 0; left: 0; width: 100%; background: white; z-index: 99999; } } @media screen { #relatorio-print { display: none; } }`;
-            document.head.appendChild(style);
-            window.print();
-            setTimeout(()=>{ const s=document.getElementById("__print_style"); if(s)s.remove(); }, 2000);
+            const html = buildReportHTML();
+            const win = window.open("","_blank","width=900,height=700");
+            if(win){ win.document.write(html); win.document.close(); }
+            else { alert("Por favor, permita pop-ups para este site para exportar o PDF."); }
           };
 
           return (
@@ -1978,15 +2054,7 @@ Cancelar = Dar baixa só nesta parcela`);
                 </div>
               </div>
 
-              {/* DIV OCULTA PARA IMPRESSÃO */}
-              <div id="relatorio-print" style={{display:"none",fontFamily:"Arial,sans-serif",padding:"24px",maxWidth:"900px",margin:"0 auto"}}>
-                <style>{`@media print { table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid #e5e7eb; padding: 6px 10px; font-size: 11px; } th { background: #f3f4f6; font-weight: 600; } @page { margin: 15mm; } }`}</style>
-                <div style={{background:"linear-gradient(135deg,#166534,#22C55E)",color:"#fff",padding:"16px 20px",borderRadius:"8px 8px 0 0",marginBottom:0,display:"flex",justifyContent:"space-between"}}>
-                  <div><h2 style={{margin:0,fontSize:"18px"}}>🌱 GreenMind — Financial Planning</h2></div>
-                  <div style={{textAlign:"right",fontSize:"13px"}}><p style={{margin:0}}>{relTipo==="mensal"?`Fechamento Mensal — ${mesLabel}`:relTipo==="fatura"?`Fatura ${cartaoSel?.nome||""} — ${mesLabel}`:`Extrato: ${relFiltroTexto} — ${mesLabel}`}</p><p style={{margin:"4px 0 0",fontSize:"10px",opacity:0.8}}>Gerado: {dataGeracao}</p></div>
-                </div>
-                <div dangerouslySetInnerHTML={{__html: document.querySelector(".relatorio-preview-inner")?.innerHTML||""}}/>
-              </div>
+
             </div>
           );
         })()}
