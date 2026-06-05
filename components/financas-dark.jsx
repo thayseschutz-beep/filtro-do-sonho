@@ -316,6 +316,7 @@ export default function App(){
   const [syncPreview, setSyncPreview] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [faturaDetalhe, setFaturaDetalhe] = useState(null); // {cartaoId, month, year}
+  const [usoFiltroCartao, setUsoFiltroCartao] = useState(""); // filter for uso de cartoes table
   const [pagamentoModal, setPagamentoModal] = useState(null); // {cartaoId, month, year, valorFatura, nomeCartao}
   const [pagForm, setPagForm] = useState({tipo:"total", valor:"", data:"", obs:""});
   const [editUso, setEditUso] = useState(null); // for editing a credit card purchase
@@ -1440,19 +1441,20 @@ Cancelar = Dar baixa só nesta parcela`);
                 {usoCartoes.length>0&&(
                   <div style={card()}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px",flexWrap:"wrap",gap:"8px"}}>
-                      <p style={{fontSize:"13px",fontWeight:600,color:T.text,margin:0}}>📋 Histórico ({usoCartoes.length} compras)</p>
+                      {(()=>{const filtered=usoFiltroCartao?usoCartoes.filter(u=>u.cartaoId===usoFiltroCartao):usoCartoes;
+                    return <p style={{fontSize:"13px",fontWeight:600,color:T.text,margin:0}}>📋 Histórico ({filtered.length}{usoFiltroCartao?" filtradas":""} de {usoCartoes.length} compras)</p>;})()}
                       <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
-                        <select style={{...selS,width:"auto",fontSize:"12px"}} value={faturaDetalhe?.cartaoId||""} onChange={e=>setFaturaDetalhe(e.target.value?{cartaoId:e.target.value,month:currentMonth,year:CY,faturaTab:"uso"}:null)}>
-                          <option value="">Filtrar por cartão</option>
+                        <select style={{...selS,width:"auto",fontSize:"12px"}} value={usoFiltroCartao} onChange={e=>setUsoFiltroCartao(e.target.value)}>
+                          <option value="">Todos os cartões</option>
                           {cartoes.map(c=><option key={c.id} value={c.id}>{c.nome}</option>)}
                         </select>
-                        {faturaDetalhe?.cartaoId&&<button style={{...btnG,fontSize:"11px",padding:"4px 10px"}} onClick={()=>setFaturaDetalhe(null)}>✕ Limpar</button>}
+                        {usoFiltroCartao&&<button style={{...btnG,fontSize:"11px",padding:"4px 10px"}} onClick={()=>setUsoFiltroCartao("")}>✕ Limpar</button>}
                       </div>
                     </div>
                     <div style={{overflowX:"auto"}}>
                       <table style={{width:"100%",borderCollapse:"collapse",fontSize:"12px"}}>
                         <thead><tr>{["Cartão","Data","Descrição","Valor","Parcelas","Valor/Parc.",""].map(h=><th key={h} style={{padding:"8px 10px",textAlign:"left",color:T.textSub,fontWeight:600,borderBottom:`1px solid ${T.border}`}}>{h}</th>)}</tr></thead>
-                        <tbody>{usoCartoes.map(u=>{const ci=cartoes.findIndex(c=>c.id===u.cartaoId);return(
+                        <tbody>{(usoFiltroCartao?usoCartoes.filter(u=>u.cartaoId===usoFiltroCartao):usoCartoes).map(u=>{const ci=cartoes.findIndex(c=>c.id===u.cartaoId);return(
                           <tr key={u.id}>
                             <td style={{padding:"8px 10px"}}><span style={chip(CARD_COLORS[ci>=0?ci%8:0])}>{cartoes[ci]?.nome||"?"}</span></td>
                             <td style={{padding:"8px 10px",color:T.textSub}}>{u.data}</td>
