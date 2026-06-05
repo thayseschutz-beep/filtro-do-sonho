@@ -317,6 +317,10 @@ export default function App(){
   const [syncing, setSyncing] = useState(false);
   const [faturaDetalhe, setFaturaDetalhe] = useState(null); // {cartaoId, month, year}
   const [usoFiltroCartao, setUsoFiltroCartao] = useState(""); // filter for uso de cartoes table
+  const [relTipo, setRelTipo] = useState("mensal");
+  const [relCartaoId, setRelCartaoId] = useState("");
+  const [relMes, setRelMes] = useState(`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,"0")}`);
+  const [relFiltroTexto, setRelFiltroTexto] = useState("");
   const [pagamentoModal, setPagamentoModal] = useState(null); // {cartaoId, month, year, valorFatura, nomeCartao}
   const [pagForm, setPagForm] = useState({tipo:"total", valor:"", data:"", obs:""});
   const [editUso, setEditUso] = useState(null); // for editing a credit card purchase
@@ -819,7 +823,7 @@ Cancelar = Dar baixa só nesta parcela`);
   };
 
   // nav
-  const navItems=[{key:"dashboard",icon:"📊",label:"Dashboard"},{key:"lancamentos",icon:"✏️",label:"Lançamentos"},{key:"buscar",icon:"🔍",label:"Buscar"},{key:"relatorio",icon:"📈",label:"Relatório"},{key:"cartoes",icon:"💳",label:"Cartões"},{key:"cadastros",icon:"🗂️",label:"Cadastros"},{key:"mei",icon:"🏢",label:"MEI"},{key:"sincronizar",icon:"🔄",label:"Sincronizar"}];
+  const navItems=[{key:"dashboard",icon:"📊",label:"Dashboard"},{key:"lancamentos",icon:"✏️",label:"Lançamentos"},{key:"buscar",icon:"🔍",label:"Buscar"},{key:"relatorio",icon:"📈",label:"Relatório"},{key:"cartoes",icon:"💳",label:"Cartões"},{key:"cadastros",icon:"🗂️",label:"Cadastros"},{key:"mei",icon:"🏢",label:"MEI"},{key:"emitir",icon:"📄",label:"Emitir Relatório"},{key:"sincronizar",icon:"🔄",label:"Sincronizar"}];
   const cardSubNav=[["cadastro","📋","Cadastro"],["uso","🛒","Uso de Cartões"],["faturas","📄","Faturas"],["relatorio_c","📊","Relatório"],["dashcard","🖥️","Dashboard"]];
   const cadSubNav=[["bancos","🏦","Bancos"],["fornecedores","🏢","Fornecedores"],["pessoas","👤","Pessoas"]];
   const lancTabs=[{key:"receita",label:"📥 Receitas",col:T.green},{key:"despesa",label:"📤 Despesas",col:T.red},{key:"investimento",label:"💎 Investimentos",col:T.blue},{key:"emprestimo",label:"🔄 Empréstimos",col:T.amber}];
@@ -871,11 +875,11 @@ Cancelar = Dar baixa só nesta parcela`);
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"20px",flexWrap:"wrap",gap:"12px"}}>
           <div>
             <h1 style={{fontSize:"20px",fontWeight:700,color:T.text,margin:0}}>
-              {{dashboard:"Dashboard",lancamentos:"Lançamentos",relatorio:"Relatório Anual",cartoes:"Cartões de Crédito",cadastros:"Cadastros",mei:"🏢 Gestão MEI",sincronizar:"Sincronizar com Google Sheets"}[activeSection]}
+              {{dashboard:"Dashboard",lancamentos:"Lançamentos",relatorio:"Relatório Anual",cartoes:"Cartões de Crédito",cadastros:"Cadastros",mei:"🏢 Gestão MEI",emitir:"📄 Emitir Relatório",sincronizar:"Sincronizar com Google Sheets"}[activeSection]}
             </h1>
             <p style={{color:T.textSub,fontSize:"13px",margin:"2px 0 0"}}>GreenMind — Financial Planning • {CY}</p>
           </div>
-          {activeSection!=="cartoes"&&activeSection!=="cadastros"&&activeSection!=="sincronizar"&&activeSection!=="mei"&&activeSection!=="buscar"&&(
+          {activeSection!=="cartoes"&&activeSection!=="cadastros"&&activeSection!=="sincronizar"&&activeSection!=="mei"&&activeSection!=="buscar"&&activeSection!=="emitir"&&(
             <div style={{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}}>
               {!isMobile&&<div style={{display:"flex",background:T.surfaceAlt,borderRadius:"10px",padding:"3px",border:`1px solid ${T.border}`,gap:"2px"}}>
                 {["mes","ano"].map(v=><button key={v} style={toggleB(view===v)} onClick={()=>setView(v)}>{v==="mes"?"Mês":"Ano"}</button>)}
@@ -1689,6 +1693,303 @@ Cancelar = Dar baixa só nesta parcela`);
             )}
           </div>
         )}
+
+        {/* ── EMITIR RELATÓRIO ── */}
+        {activeSection==="emitir"&&(()=>{
+          const [relAno, relMesNum] = relMes.split("-").map(Number);
+          const mesIdx = relMesNum - 1;
+          const mesData = (allYearsData[String(relAno)]||emptyYear())[mesIdx] || {receitas:[],despesas:[],investimentos:[],emprestimos:[]};
+          const cartaoSel = cartoes.find(c=>c.id===relCartaoId);
+
+          // Dados do relatório mensal
+          const recTotal = sumArr(mesData.receitas);
+          const despTotal = sumArr(mesData.despesas);
+          const invTotal = sumArr(mesData.investimentos);
+          const empTotal = sumArr(mesData.emprestimos);
+          const fatMes = cartoes.reduce((s,c)=>s+getFat(c.id,relAno,mesIdx),0);
+          const fatPago = cartoes.reduce((s,c)=>s+(isPago(c.id,relAno,mesIdx)?getFat(c.id,relAno,mesIdx):0),0);
+          const fatAberto = fatMes - fatPago;
+          const saldoMes = recTotal - despTotal - invTotal - empTotal - fatMes;
+
+          // Dados da fatura do cartão
+          const comprasCartao = relCartaoId ? usoCartoes.filter(u=>u.cartaoId===relCartaoId&&getInstMonths(u).some(im=>im.year===relAno&&im.month===mesIdx)) : [];
+          const fatCartaoTotal = relCartaoId ? getFat(relCartaoId, relAno, mesIdx) : 0;
+          const fatCartaoPaga = relCartaoId ? isPago(relCartaoId, relAno, mesIdx) : false;
+
+          // Dados por texto (fornecedor/cliente)
+          const q = relFiltroTexto.toLowerCase().trim();
+          const itensFiltrados = q ? [
+            ...mesData.receitas.filter(x=>(x.desc||"").toLowerCase().includes(q)||(x.cliente||"").toLowerCase().includes(q)).map(x=>({...x,_tipo:"Receita",_col:"#16A34A"})),
+            ...mesData.despesas.filter(x=>(x.desc||"").toLowerCase().includes(q)||(x.fornecedor||"").toLowerCase().includes(q)).map(x=>({...x,_tipo:"Despesa",_col:"#DC2626"})),
+            ...mesData.investimentos.filter(x=>(x.desc||"").toLowerCase().includes(q)).map(x=>({...x,_tipo:"Investimento",_col:"#0284C7"})),
+            ...mesData.emprestimos.filter(x=>(x.desc||"").toLowerCase().includes(q)||(x.parafem||"").toLowerCase().includes(q)).map(x=>({...x,_tipo:"Empréstimo",_col:"#D97706"})),
+          ] : [];
+
+          const fmt2 = (v) => new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(v||0);
+          const dataGeracao = new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+          const mesLabel = `${MONTHS[mesIdx]}/${relAno}`;
+
+          const printReport = () => {
+            const style = document.createElement("style");
+            style.id = "__print_style";
+            style.innerHTML = `@media print { body > * { display: none !important; } #relatorio-print { display: block !important; position: fixed; top: 0; left: 0; width: 100%; background: white; z-index: 99999; } } @media screen { #relatorio-print { display: none; } }`;
+            document.head.appendChild(style);
+            window.print();
+            setTimeout(()=>{ const s=document.getElementById("__print_style"); if(s)s.remove(); }, 2000);
+          };
+
+          return (
+            <div>
+              {/* Painel de controle */}
+              <div style={card()}>
+                <p style={{fontSize:"14px",fontWeight:700,color:T.text,marginBottom:"14px"}}>📄 Configurar Relatório</p>
+                <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:"12px",marginBottom:"14px"}}>
+                  <div>
+                    <label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Tipo de Relatório</label>
+                    <select style={selS} value={relTipo} onChange={e=>setRelTipo(e.target.value)}>
+                      <option value="mensal">📅 Fechamento Mensal</option>
+                      <option value="fatura">💳 Fatura de Cartão</option>
+                      <option value="filtro">🔍 Por Fornecedor / Cliente</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Competência (mês/ano)</label>
+                    <input type="month" style={inpS} value={relMes} onChange={e=>setRelMes(e.target.value)}/>
+                  </div>
+                  {relTipo==="fatura"&&(
+                    <div>
+                      <label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Cartão</label>
+                      <select style={selS} value={relCartaoId} onChange={e=>setRelCartaoId(e.target.value)}>
+                        <option value="">Selecione o cartão</option>
+                        {cartoes.map(c=><option key={c.id} value={c.id}>{c.nome}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  {relTipo==="filtro"&&(
+                    <div>
+                      <label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Pesquisar por</label>
+                      <input style={inpS} placeholder="Ex: Casas da Água, Caixa..." value={relFiltroTexto} onChange={e=>setRelFiltroTexto(e.target.value)}/>
+                    </div>
+                  )}
+                </div>
+                <button style={btnP(T.green)} onClick={printReport}>🖨️ Imprimir / Exportar PDF</button>
+              </div>
+
+              {/* PREVIEW DO RELATÓRIO */}
+              <div style={{...card(),border:"2px solid #E2E8F0",background:"#fff"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"16px",flexWrap:"wrap",gap:"8px"}}>
+                  <p style={{fontSize:"13px",fontWeight:600,color:T.textSub,margin:0}}>Pré-visualização</p>
+                  <p style={{fontSize:"11px",color:T.textMuted,margin:0}}>Gerado em {dataGeracao}</p>
+                </div>
+
+                {/* ─ CONTEÚDO DO RELATÓRIO ─ */}
+                <div style={{border:"1px solid #E2E8F0",borderRadius:"12px",overflow:"hidden"}}>
+                  {/* Header do relatório */}
+                  <div style={{background:"linear-gradient(135deg,#166534,#22C55E)",padding:"20px 24px",color:"#fff"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:"8px"}}>
+                      <div>
+                        <h2 style={{margin:0,fontSize:"20px",fontWeight:700}}>🌱 GreenMind</h2>
+                        <p style={{margin:"4px 0 0",fontSize:"12px",opacity:0.85}}>Financial Planning</p>
+                      </div>
+                      <div style={{textAlign:"right"}}>
+                        <p style={{margin:0,fontSize:"16px",fontWeight:600}}>
+                          {relTipo==="mensal"&&`Fechamento Mensal — ${mesLabel}`}
+                          {relTipo==="fatura"&&`Fatura ${cartaoSel?.nome||"Cartão"} — ${mesLabel}`}
+                          {relTipo==="filtro"&&`Extrato: ${relFiltroTexto||"—"} — ${mesLabel}`}
+                        </p>
+                        <p style={{margin:"4px 0 0",fontSize:"11px",opacity:0.8}}>{dataGeracao}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{padding:"20px 24px"}}>
+                    {/* ── FECHAMENTO MENSAL ── */}
+                    {relTipo==="mensal"&&(
+                      <div>
+                        {/* Resumo */}
+                        <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:"10px",marginBottom:"20px"}}>
+                          {[
+                            {l:"Total Receitas",v:recTotal,c:"#16A34A",bg:"#DCFCE7",icon:"↑"},
+                            {l:"Total Despesas",v:despTotal+empTotal,c:"#DC2626",bg:"#FEE2E2",icon:"↓"},
+                            {l:"Cartões (fatura)",v:fatMes,c:"#D97706",bg:"#FEF3C7",icon:"💳",sub:fatAberto>0?`${fmt2(fatAberto)} em aberto`:"✓ Pago"},
+                            {l:"Saldo do Mês",v:saldoMes,c:saldoMes>=0?"#1D4ED8":"#DC2626",bg:saldoMes>=0?"#EFF6FF":"#FEE2E2",icon:"="},
+                          ].map(m=>(
+                            <div key={m.l} style={{background:m.bg,borderRadius:"10px",padding:"14px",border:`1px solid ${m.c}20`}}>
+                              <p style={{fontSize:"11px",color:m.c,fontWeight:600,textTransform:"uppercase",margin:"0 0 4px",letterSpacing:"0.05em"}}>{m.icon} {m.l}</p>
+                              <p style={{fontSize:"22px",fontWeight:700,color:m.c,margin:0}}>{fmt2(m.v)}</p>
+                              {m.sub&&<p style={{fontSize:"10px",color:m.c,margin:"3px 0 0"}}>{m.sub}</p>}
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Receitas */}
+                        {mesData.receitas.length>0&&(
+                          <div style={{marginBottom:"20px"}}>
+                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#DCFCE7",padding:"8px 14px",borderRadius:"8px 8px 0 0",borderBottom:"2px solid #16A34A"}}>
+                              <span style={{fontWeight:700,color:"#14532D",fontSize:"13px"}}>📥 Receitas</span>
+                              <span style={{fontWeight:700,color:"#16A34A"}}>{fmt2(recTotal)}</span>
+                            </div>
+                            <table style={{width:"100%",borderCollapse:"collapse",fontSize:"12px"}}>
+                              <thead><tr style={{background:"#F0FDF4"}}>
+                                {["Descrição","Cliente","Data","Forma Rec.","Status","Valor"].map(h=><th key={h} style={{padding:"7px 12px",textAlign:h==="Valor"?"right":"left",color:"#166534",fontWeight:600,borderBottom:"1px solid #BBF7D0"}}>{h}</th>)}
+                              </tr></thead>
+                              <tbody>{mesData.receitas.map((r,i)=>(
+                                <tr key={r.id} style={{background:i%2===0?"#fff":"#F9FAFB"}}>
+                                  <td style={{padding:"7px 12px",color:"#111827"}}>{r.desc}</td>
+                                  <td style={{padding:"7px 12px",color:"#6B7280"}}>{r.cliente||"—"}</td>
+                                  <td style={{padding:"7px 12px",color:"#6B7280",whiteSpace:"nowrap"}}>{r.date}</td>
+                                  <td style={{padding:"7px 12px",color:"#6B7280"}}>{({pix:"PIX",dinheiro:"Dinheiro",ted:"TED",cheque:"Cheque"})[r.formaRec]||r.formaRec||"—"}</td>
+                                  <td style={{padding:"7px 12px"}}><span style={{background:r.recebido?"#DCFCE7":"#FEF3C7",color:r.recebido?"#16A34A":"#D97706",padding:"2px 8px",borderRadius:"10px",fontSize:"10px",fontWeight:600}}>{r.recebido?"✓ Recebido":"Pendente"}</span></td>
+                                  <td style={{padding:"7px 12px",textAlign:"right",fontWeight:600,color:"#16A34A"}}>{fmt2(r.valor)}</td>
+                                </tr>
+                              ))}</tbody>
+                              <tfoot><tr style={{background:"#DCFCE7"}}><td colSpan={5} style={{padding:"8px 12px",fontWeight:700,color:"#14532D"}}>Total Receitas</td><td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,color:"#16A34A"}}>{fmt2(recTotal)}</td></tr></tfoot>
+                            </table>
+                          </div>
+                        )}
+
+                        {/* Despesas */}
+                        {mesData.despesas.length>0&&(
+                          <div style={{marginBottom:"20px"}}>
+                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#FEE2E2",padding:"8px 14px",borderRadius:"8px 8px 0 0",borderBottom:"2px solid #DC2626"}}>
+                              <span style={{fontWeight:700,color:"#7F1D1D",fontSize:"13px"}}>📤 Despesas</span>
+                              <span style={{fontWeight:700,color:"#DC2626"}}>{fmt2(despTotal)}</span>
+                            </div>
+                            <table style={{width:"100%",borderCollapse:"collapse",fontSize:"12px"}}>
+                              <thead><tr style={{background:"#FFF5F5"}}>
+                                {["Descrição","Fornecedor","Data","Meio Pag.","Parcela","Status","Valor"].map(h=><th key={h} style={{padding:"7px 12px",textAlign:h==="Valor"?"right":"left",color:"#991B1B",fontWeight:600,borderBottom:"1px solid #FECACA"}}>{h}</th>)}
+                              </tr></thead>
+                              <tbody>{mesData.despesas.map((d,i)=>(
+                                <tr key={d.id} style={{background:i%2===0?"#fff":"#F9FAFB"}}>
+                                  <td style={{padding:"7px 12px",color:"#111827"}}>{d.desc}</td>
+                                  <td style={{padding:"7px 12px",color:"#6B7280"}}>{d.fornecedor||"—"}</td>
+                                  <td style={{padding:"7px 12px",color:"#6B7280",whiteSpace:"nowrap"}}>{d.date}</td>
+                                  <td style={{padding:"7px 12px",color:"#6B7280"}}>{({pix:"PIX",dinheiro:"Dinheiro",cheque:"Cheque",boleto:"Boleto",cartao:"Cartão"})[d.meioPag]||"—"}</td>
+                                  <td style={{padding:"7px 12px",color:"#D97706",fontSize:"11px"}}>{d.parcelaNum?`${d.parcelaNum}/${d.parcelas}`:"—"}</td>
+                                  <td style={{padding:"7px 12px"}}><span style={{background:d.pago?"#DCFCE7":"#FEF3C7",color:d.pago?"#16A34A":"#D97706",padding:"2px 8px",borderRadius:"10px",fontSize:"10px",fontWeight:600}}>{d.pago?"✓ Pago":"Pendente"}</span></td>
+                                  <td style={{padding:"7px 12px",textAlign:"right",fontWeight:600,color:"#DC2626"}}>{fmt2(d.valor)}</td>
+                                </tr>
+                              ))}</tbody>
+                              <tfoot><tr style={{background:"#FEE2E2"}}><td colSpan={6} style={{padding:"8px 12px",fontWeight:700,color:"#7F1D1D"}}>Total Despesas</td><td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,color:"#DC2626"}}>{fmt2(despTotal)}</td></tr></tfoot>
+                            </table>
+                          </div>
+                        )}
+
+                        {/* Cartões */}
+                        {fatMes>0&&(
+                          <div style={{marginBottom:"20px"}}>
+                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#FEF3C7",padding:"8px 14px",borderRadius:"8px 8px 0 0",borderBottom:"2px solid #D97706"}}>
+                              <span style={{fontWeight:700,color:"#78350F",fontSize:"13px"}}>💳 Faturas de Cartão</span>
+                              <span style={{fontWeight:700,color:"#D97706"}}>{fmt2(fatMes)}</span>
+                            </div>
+                            <table style={{width:"100%",borderCollapse:"collapse",fontSize:"12px"}}>
+                              <thead><tr style={{background:"#FFFBEB"}}>{["Cartão","Total Fatura","Status"].map(h=><th key={h} style={{padding:"7px 12px",textAlign:"left",color:"#92400E",fontWeight:600,borderBottom:"1px solid #FDE68A"}}>{h}</th>)}</tr></thead>
+                              <tbody>{cartoes.map((c,i)=>{const v=getFat(c.id,relAno,mesIdx);const pg=isPago(c.id,relAno,mesIdx);return v>0?(<tr key={c.id} style={{background:i%2===0?"#fff":"#FFFBEB"}}>
+                                <td style={{padding:"7px 12px",fontWeight:600}}>{c.nome}</td>
+                                <td style={{padding:"7px 12px",fontWeight:600,color:"#D97706"}}>{fmt2(v)}</td>
+                                <td style={{padding:"7px 12px"}}><span style={{background:pg?"#DCFCE7":"#FEE2E2",color:pg?"#16A34A":"#DC2626",padding:"2px 8px",borderRadius:"10px",fontSize:"10px",fontWeight:600}}>{pg?"✓ Pago":"Em aberto"}</span></td>
+                              </tr>):null;})}</tbody>
+                            </table>
+                          </div>
+                        )}
+
+                        {/* Rodapé saldo */}
+                        <div style={{background:saldoMes>=0?"#EFF6FF":"#FEF2F2",border:`2px solid ${saldoMes>=0?"#BFDBFE":"#FECACA"}`,borderRadius:"10px",padding:"14px 20px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                          <span style={{fontSize:"14px",fontWeight:600,color:saldoMes>=0?"#1E3A8A":"#7F1D1D"}}>Saldo Final — {mesLabel}</span>
+                          <span style={{fontSize:"26px",fontWeight:700,color:saldoMes>=0?"#1D4ED8":"#DC2626"}}>{fmt2(saldoMes)}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ── FATURA DE CARTÃO ── */}
+                    {relTipo==="fatura"&&(
+                      <div>
+                        {!relCartaoId&&<p style={{color:"#6B7280",textAlign:"center",padding:"20px"}}>Selecione um cartão acima para gerar a fatura.</p>}
+                        {relCartaoId&&(
+                          <div>
+                            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"10px",marginBottom:"20px"}}>
+                              {[{l:"Cartão",v:cartaoSel?.nome||"—",isText:true},{l:"Vencimento",v:cartaoSel?`Dia ${cartaoSel.diaPagamento}`:"-",isText:true},{l:"Total Fatura",v:fmt2(fatCartaoTotal),c:"#D97706"},{l:"Parcelas",v:`${comprasCartao.length} compras`,isText:true},{l:"Limite",v:cartaoSel?.limite>0?fmt2(cartaoSel.limite):"Não informado",isText:true},{l:"Status",v:fatCartaoPaga?"✓ PAGO":"EM ABERTO",c:fatCartaoPaga?"#16A34A":"#DC2626"}].map(m=>(
+                                <div key={m.l} style={{background:"#F9FAFB",borderRadius:"8px",padding:"12px",border:"1px solid #E5E7EB"}}>
+                                  <p style={{fontSize:"10px",color:"#6B7280",fontWeight:600,textTransform:"uppercase",margin:"0 0 4px"}}>{m.l}</p>
+                                  <p style={{fontSize:m.c?"18px":"14px",fontWeight:700,color:m.c||"#111827",margin:0}}>{m.v}</p>
+                                </div>
+                              ))}
+                            </div>
+                            <table style={{width:"100%",borderCollapse:"collapse",fontSize:"12px",marginBottom:"14px"}}>
+                              <thead><tr style={{background:"#FEF3C7"}}>
+                                {["Data","Descrição","Parcela","Valor Parcela","Valor Total"].map(h=><th key={h} style={{padding:"8px 12px",textAlign:h.includes("Valor")?"right":"left",color:"#92400E",fontWeight:600,borderBottom:"2px solid #D97706"}}>{h}</th>)}
+                              </tr></thead>
+                              <tbody>{comprasCartao.map((u,i)=>{const np=getInstMonths(u).findIndex(im=>im.year===relAno&&im.month===mesIdx)+1;return(
+                                <tr key={u.id} style={{background:i%2===0?"#fff":"#FFFBEB"}}>
+                                  <td style={{padding:"7px 12px",color:"#6B7280",whiteSpace:"nowrap"}}>{u.data}</td>
+                                  <td style={{padding:"7px 12px",color:"#111827",fontWeight:500}}>{u.descricao}</td>
+                                  <td style={{padding:"7px 12px",color:"#D97706"}}>{np}/{u.parcelas}x</td>
+                                  <td style={{padding:"7px 12px",textAlign:"right",fontWeight:600,color:"#D97706"}}>{fmt2(u.valorParcela)}</td>
+                                  <td style={{padding:"7px 12px",textAlign:"right",color:"#6B7280"}}>{fmt2(u.valor)}</td>
+                                </tr>);
+                              })}</tbody>
+                              <tfoot><tr style={{background:"#FEF3C7"}}><td colSpan={3} style={{padding:"8px 12px",fontWeight:700,color:"#78350F"}}>TOTAL DA FATURA</td><td colSpan={2} style={{padding:"8px 12px",textAlign:"right",fontWeight:700,fontSize:"16px",color:"#D97706"}}>{fmt2(fatCartaoTotal)}</td></tr></tfoot>
+                            </table>
+                            <div style={{background:fatCartaoPaga?"#DCFCE7":"#FEE2E2",border:`2px solid ${fatCartaoPaga?"#16A34A":"#DC2626"}`,borderRadius:"10px",padding:"12px 20px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                              <span style={{fontWeight:600,color:fatCartaoPaga?"#14532D":"#7F1D1D"}}>Status do Pagamento</span>
+                              <span style={{fontWeight:700,fontSize:"16px",color:fatCartaoPaga?"#16A34A":"#DC2626"}}>{fatCartaoPaga?"✓ FATURA PAGA":"⚠ FATURA EM ABERTO"}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* ── POR FORNECEDOR/CLIENTE ── */}
+                    {relTipo==="filtro"&&(
+                      <div>
+                        {!relFiltroTexto&&<p style={{color:"#6B7280",textAlign:"center",padding:"20px"}}>Digite um fornecedor, cliente ou descrição acima.</p>}
+                        {relFiltroTexto&&itensFiltrados.length===0&&<p style={{color:"#6B7280",textAlign:"center",padding:"20px"}}>Nenhum resultado para "{relFiltroTexto}" em {mesLabel}.</p>}
+                        {itensFiltrados.length>0&&(
+                          <div>
+                            <table style={{width:"100%",borderCollapse:"collapse",fontSize:"12px",marginBottom:"14px"}}>
+                              <thead><tr style={{background:"#F3F4F6"}}>
+                                {["Tipo","Descrição","Fornecedor/Cliente","Data","Parcela","Status","Valor"].map(h=><th key={h} style={{padding:"8px 12px",textAlign:h==="Valor"?"right":"left",color:"#374151",fontWeight:600,borderBottom:"2px solid #E5E7EB"}}>{h}</th>)}
+                              </tr></thead>
+                              <tbody>{itensFiltrados.map((item,i)=>(
+                                <tr key={item.id} style={{background:i%2===0?"#fff":"#F9FAFB"}}>
+                                  <td style={{padding:"7px 12px"}}><span style={{background:`${item._col}20`,color:item._col,padding:"2px 8px",borderRadius:"10px",fontSize:"10px",fontWeight:600}}>{item._tipo}</span></td>
+                                  <td style={{padding:"7px 12px",fontWeight:500}}>{item.desc}</td>
+                                  <td style={{padding:"7px 12px",color:"#6B7280"}}>{item.fornecedor||item.cliente||item.parafem||"—"}</td>
+                                  <td style={{padding:"7px 12px",color:"#6B7280",whiteSpace:"nowrap"}}>{item.date}</td>
+                                  <td style={{padding:"7px 12px",color:"#D97706",fontSize:"11px"}}>{item.parcelaNum?`${item.parcelaNum}/${item.parcelas}`:"—"}</td>
+                                  <td style={{padding:"7px 12px"}}><span style={{background:(item.pago||item.recebido||item.investido)?"#DCFCE7":"#FEF3C7",color:(item.pago||item.recebido||item.investido)?"#16A34A":"#D97706",padding:"2px 8px",borderRadius:"10px",fontSize:"10px",fontWeight:600}}>{(item.pago||item.recebido||item.investido)?"✓ Pago":"Pendente"}</span></td>
+                                  <td style={{padding:"7px 12px",textAlign:"right",fontWeight:600,color:item._col}}>{fmt2(item.valor)}</td>
+                                </tr>
+                              ))}</tbody>
+                              <tfoot><tr style={{background:"#F3F4F6"}}><td colSpan={6} style={{padding:"8px 12px",fontWeight:700}}>Total</td><td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,fontSize:"14px"}}>{fmt2(itensFiltrados.reduce((s,x)=>s+x.valor,0))}</td></tr></tfoot>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Rodapé do relatório */}
+                    <div style={{borderTop:"1px solid #E5E7EB",marginTop:"20px",paddingTop:"14px",display:"flex",justifyContent:"space-between",fontSize:"11px",color:"#9CA3AF"}}>
+                      <span>GreenMind — Financial Planning</span>
+                      <span>{dataGeracao}</span>
+                      <span>Confidencial</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* DIV OCULTA PARA IMPRESSÃO */}
+              <div id="relatorio-print" style={{display:"none",fontFamily:"Arial,sans-serif",padding:"24px",maxWidth:"900px",margin:"0 auto"}}>
+                <style>{`@media print { table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid #e5e7eb; padding: 6px 10px; font-size: 11px; } th { background: #f3f4f6; font-weight: 600; } @page { margin: 15mm; } }`}</style>
+                <div style={{background:"linear-gradient(135deg,#166534,#22C55E)",color:"#fff",padding:"16px 20px",borderRadius:"8px 8px 0 0",marginBottom:0,display:"flex",justifyContent:"space-between"}}>
+                  <div><h2 style={{margin:0,fontSize:"18px"}}>🌱 GreenMind — Financial Planning</h2></div>
+                  <div style={{textAlign:"right",fontSize:"13px"}}><p style={{margin:0}}>{relTipo==="mensal"?`Fechamento Mensal — ${mesLabel}`:relTipo==="fatura"?`Fatura ${cartaoSel?.nome||""} — ${mesLabel}`:`Extrato: ${relFiltroTexto} — ${mesLabel}`}</p><p style={{margin:"4px 0 0",fontSize:"10px",opacity:0.8}}>Gerado: {dataGeracao}</p></div>
+                </div>
+                <div dangerouslySetInnerHTML={{__html: document.querySelector(".relatorio-preview-inner")?.innerHTML||""}}/>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ── MEI ── */}
         {activeSection==="mei"&&(()=>{
