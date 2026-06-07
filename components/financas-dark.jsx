@@ -326,6 +326,7 @@ export default function App(){
   const [editUso, setEditUso] = useState(null); // for editing a credit card purchase
   const [meiData, setMeiData] = useState(emptyMei());
   const [searchQuery, setSearchQuery] = useState("");
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [meiTab, setMeiTab] = useState("lancamentos");
   const [meiViewYear, setMeiViewYear] = useState(new Date().getFullYear());
   const [meiVisualMonth, setMeiVisualMonth] = useState(new Date().toISOString().slice(0,7));
@@ -1486,7 +1487,7 @@ Cancelar = Dar baixa só nesta parcela`);
                   {[["apagar","A Pagar"],["pagamentos","Pagamentos"],["inadimplencias","Inadimplências"]].map(([k,l])=><button key={k} style={subT(faturaTab===k)} onClick={()=>setFaturaTab(k)}>{l}</button>)}
                 </div>
                 {(faturaTab==="apagar"||faturaTab==="pagamentos"||faturaTab==="inadimplencias")&&(
-                  <div style={{...card(),overflowX:"auto"}}>
+                  <div style={{...card(),overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
                     <p style={{fontSize:"13px",fontWeight:600,color:T.text,marginBottom:"12px"}}>
                       {faturaTab==="apagar"?"📅 Faturas a Pagar":faturaTab==="pagamentos"?"✅ Pagamentos Realizados":"⚠️ Faturas em Aberto"}
                       {faturaTab==="apagar"&&<span style={{color:T.textSub,fontWeight:400,fontSize:"12px"}}> — clique para marcar como pago</span>}
@@ -1859,7 +1860,7 @@ Cancelar = Dar baixa só nesta parcela`);
                 </div>
 
                 {/* ─ CONTEÚDO DO RELATÓRIO ─ */}
-                <div style={{border:"1px solid #E2E8F0",borderRadius:"12px",overflow:"hidden"}}>
+<div style={{border:"1px solid #E2E8F0",borderRadius:"12px",overflow:"hidden",overflowX:isMobile?"auto":"hidden"}}>
                   {/* Header do relatório */}
                   <div style={{background:"linear-gradient(135deg,#166534,#22C55E)",padding:"20px 24px",color:"#fff"}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:"8px"}}>
@@ -1983,7 +1984,7 @@ Cancelar = Dar baixa só nesta parcela`);
                         {!relCartaoId&&<p style={{color:"#6B7280",textAlign:"center",padding:"20px"}}>Selecione um cartão acima para gerar a fatura.</p>}
                         {relCartaoId&&(
                           <div>
-                            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"10px",marginBottom:"20px"}}>
+                            <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(2,1fr)":"repeat(3,1fr)",gap:"10px",marginBottom:"20px"}}>
                               {[{l:"Cartão",v:cartaoSel?.nome||"—",isText:true},{l:"Vencimento",v:cartaoSel?`Dia ${cartaoSel.diaPagamento}`:"-",isText:true},{l:"Total Fatura",v:fmt2(fatCartaoTotal),c:"#D97706"},{l:"Parcelas",v:`${comprasCartao.length} compras`,isText:true},{l:"Limite",v:cartaoSel?.limite>0?fmt2(cartaoSel.limite):"Não informado",isText:true},{l:"Status",v:fatCartaoPaga?"✓ PAGO":"EM ABERTO",c:fatCartaoPaga?"#16A34A":"#DC2626"}].map(m=>(
                                 <div key={m.l} style={{background:"#F9FAFB",borderRadius:"8px",padding:"12px",border:"1px solid #E5E7EB"}}>
                                   <p style={{fontSize:"10px",color:"#6B7280",fontWeight:600,textTransform:"uppercase",margin:"0 0 4px"}}>{m.l}</p>
@@ -1991,7 +1992,7 @@ Cancelar = Dar baixa só nesta parcela`);
                                 </div>
                               ))}
                             </div>
-                            <table style={{width:"100%",borderCollapse:"collapse",fontSize:"12px",marginBottom:"14px"}}>
+                            <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:"12px",minWidth:isMobile?"500px":"100%",marginBottom:"14px"}}>
                               <thead><tr style={{background:"#FEF3C7"}}>
                                 {["Data","Descrição","Parcela","Valor Parcela","Valor Total"].map(h=><th key={h} style={{padding:"8px 12px",textAlign:h.includes("Valor")?"right":"left",color:"#92400E",fontWeight:600,borderBottom:"2px solid #D97706"}}>{h}</th>)}
                               </tr></thead>
@@ -2810,7 +2811,7 @@ Cancelar = Dar baixa só nesta parcela`);
                     </div>
 
                     {/* Métricas */}
-                    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"8px",marginBottom:"14px"}}>
+                    <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(3,1fr)":"repeat(3,1fr)",gap:"6px",marginBottom:"14px"}}>
                       <div style={{background:T.greenLight,borderRadius:"8px",padding:"10px",border:"1px solid #BBF7D0"}}>
                         <p style={{fontSize:"10px",color:T.green,fontWeight:600,textTransform:"uppercase",margin:"0 0 3px"}}>✓ {sf==="recebido"?"Recebido":"Pago"}</p>
                         <p style={{fontSize:"16px",fontWeight:700,color:T.green,margin:0}}>{fmt(valorPago)}</p>
@@ -2844,7 +2845,7 @@ Cancelar = Dar baixa só nesta parcela`);
                     {/* Timeline de parcelas */}
                     <div>
                       <p style={{fontSize:"11px",fontWeight:600,color:T.textSub,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:"8px"}}>Timeline</p>
-                      <div style={{display:"flex",gap:"4px",flexWrap:"wrap"}}>
+                      <div style={{display:"flex",gap:"4px",flexWrap:"wrap",overflowX:isMobile?"auto":"visible",paddingBottom:isMobile?"4px":"0"}}>
                         {sorted.map((item,idx) => {
                           const isPg = !!item[sf];
                           return (
@@ -3100,15 +3101,39 @@ Cancelar = Dar baixa só nesta parcela`);
 
       {/* MOBILE BOTTOM NAV */}
       {isMobile&&(
-        <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:200,background:T.surface,borderTop:`1px solid ${T.border}`,display:"flex",justifyContent:"space-around",padding:"8px 0 12px",boxShadow:"0 -2px 10px rgba(0,0,0,0.08)"}}>
-          {[{key:"dashboard",icon:"📊",label:"Início"},{key:"lancamentos",icon:"✏️",label:"Lançar"},{key:"buscar",icon:"🔍",label:"Buscar"},{key:"cartoes",icon:"💳",label:"Cartões"},{key:"mei",icon:"🏢",label:"MEI"}].map(n=>(
-            <div key={n.key} onClick={()=>setActiveSection(n.key)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"3px",cursor:"pointer",minWidth:"56px"}}>
-              <span style={{fontSize:"20px"}}>{n.icon}</span>
-              <span style={{fontSize:"9px",fontWeight:600,color:activeSection===n.key?T.purple:T.textMuted}}>{n.label}</span>
-              {activeSection===n.key&&<span style={{width:"4px",height:"4px",borderRadius:"50%",background:T.purple,display:"block"}}/>}
+        <>
+          {/* Overlay do menu completo */}
+          {showMobileMenu&&(
+            <div style={{position:"fixed",inset:0,zIndex:300,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(4px)"}} onClick={()=>setShowMobileMenu(false)}>
+              <div style={{position:"absolute",bottom:"70px",left:0,right:0,background:T.surface,borderRadius:"20px 20px 0 0",padding:"20px 16px",boxShadow:"0 -4px 20px rgba(0,0,0,0.15)"}} onClick={e=>e.stopPropagation()}>
+                <div style={{width:"36px",height:"4px",background:T.border,borderRadius:"2px",margin:"0 auto 16px"}}/>
+                <p style={{fontSize:"12px",fontWeight:700,color:T.textSub,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"12px"}}>Navegação</p>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:"8px"}}>
+                  {[{key:"dashboard",icon:"📊",label:"Dashboard"},{key:"lancamentos",icon:"✏️",label:"Lançamentos"},{key:"buscar",icon:"🔍",label:"Buscar"},{key:"relatorio",icon:"📈",label:"Relatório"},{key:"cartoes",icon:"💳",label:"Cartões"},{key:"cadastros",icon:"🗂️",label:"Cadastros"},{key:"mei",icon:"🏢",label:"MEI"},{key:"emitir",icon:"📄",label:"Emitir PDF"},{key:"sincronizar",icon:"🔄",label:"Sincronizar"}].map(n=>(
+                    <div key={n.key} onClick={()=>{setActiveSection(n.key);setShowMobileMenu(false);}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"4px",padding:"12px 6px",borderRadius:"12px",cursor:"pointer",background:activeSection===n.key?T.purpleLight:T.surfaceAlt,border:`1px solid ${activeSection===n.key?T.purple:T.border}`}}>
+                      <span style={{fontSize:"22px"}}>{n.icon}</span>
+                      <span style={{fontSize:"9px",fontWeight:600,color:activeSection===n.key?T.purple:T.textSub,textAlign:"center",lineHeight:1.2}}>{n.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
-          ))}
-        </div>
+          )}
+          {/* Barra fixa bottom */}
+          <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:200,background:T.surface,borderTop:`1px solid ${T.border}`,display:"flex",justifyContent:"space-around",padding:"8px 0 env(safe-area-inset-bottom,12px)",boxShadow:"0 -2px 10px rgba(0,0,0,0.08)"}}>
+            {[{key:"dashboard",icon:"📊",label:"Início"},{key:"lancamentos",icon:"✏️",label:"Lançar"},{key:"emitir",icon:"📄",label:"Relatório"},{key:"mei",icon:"🏢",label:"MEI"}].map(n=>(
+              <div key={n.key} onClick={()=>setActiveSection(n.key)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"2px",cursor:"pointer",minWidth:"54px",padding:"4px 0"}}>
+                <span style={{fontSize:"21px"}}>{n.icon}</span>
+                <span style={{fontSize:"9px",fontWeight:600,color:activeSection===n.key?T.purple:T.textMuted}}>{n.label}</span>
+                {activeSection===n.key&&<span style={{width:"4px",height:"4px",borderRadius:"50%",background:T.purple,display:"block"}}/>}
+              </div>
+            ))}
+            <div onClick={()=>setShowMobileMenu(m=>!m)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"2px",cursor:"pointer",minWidth:"54px",padding:"4px 0"}}>
+              <span style={{fontSize:"21px"}}>{showMobileMenu?"✕":"☰"}</span>
+              <span style={{fontSize:"9px",fontWeight:600,color:T.textMuted}}>Mais</span>
+            </div>
+          </div>
+        </>
       )}
 
       {/* EDIT NF MODAL */}
