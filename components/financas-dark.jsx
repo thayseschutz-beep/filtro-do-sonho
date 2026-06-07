@@ -2006,7 +2006,7 @@ Cancelar = Dar baixa só nesta parcela`);
                                 </tr>);
                               })}</tbody>
                               <tfoot><tr style={{background:"#FEF3C7"}}><td colSpan={3} style={{padding:"8px 12px",fontWeight:700,color:"#78350F"}}>TOTAL DA FATURA</td><td colSpan={2} style={{padding:"8px 12px",textAlign:"right",fontWeight:700,fontSize:"16px",color:"#D97706"}}>{fmt2(fatCartaoTotal)}</td></tr></tfoot>
-                            </table>
+                            </table></div>
                             <div style={{background:fatCartaoPaga?"#DCFCE7":"#FEE2E2",border:`2px solid ${fatCartaoPaga?"#16A34A":"#DC2626"}`,borderRadius:"10px",padding:"12px 20px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                               <span style={{fontWeight:600,color:fatCartaoPaga?"#14532D":"#7F1D1D"}}>Status do Pagamento</span>
                               <span style={{fontWeight:700,fontSize:"16px",color:fatCartaoPaga?"#16A34A":"#DC2626"}}>{fatCartaoPaga?"✓ FATURA PAGA":"⚠ FATURA EM ABERTO"}</span>
