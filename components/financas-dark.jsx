@@ -1837,7 +1837,7 @@ Cancelar = Dar baixa só nesta parcela`);
               .tfoot-row{background:#f3f4f6}
               @media print{@page{margin:12mm}body{padding:0}}
             `;
-            let body = `<div class="header"><div><h1>🌱 GreenMind</h1><p style="font-size:10px;opacity:0.85;margin-top:3px">Financial Planning</p></div><div class="header-right"><p><strong>${titulo}</strong></p><p style="opacity:0.8;font-size:10px">${dataGeracao}</p></div></div>`;
+            let body = `<div class="header"><div><h1 style="display:flex;align-items:center;gap:8px"><img src="https://www.appgreenmind.com.br/logo-mark.png" alt="" style="width:24px;height:24px;object-fit:contain;filter:brightness(0) invert(1)"/>GreenMind</h1><p style="font-size:10px;opacity:0.85;margin-top:3px">Financial Planning</p></div><div class="header-right"><p><strong>${titulo}</strong></p><p style="opacity:0.8;font-size:10px">${dataGeracao}</p></div></div>`;
 
             if(relTipo==="mensal"){
               body += `<div class="cards">
@@ -1949,7 +1949,7 @@ Cancelar = Dar baixa só nesta parcela`);
                   <div style={{background:"linear-gradient(135deg,#166534,#22C55E)",padding:"20px 24px",color:"#fff"}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:"8px"}}>
                       <div>
-                        <h2 style={{margin:0,fontSize:"20px",fontWeight:700}}>🌱 GreenMind</h2>
+                        <h2 style={{margin:0,fontSize:"20px",fontWeight:700,display:"flex",alignItems:"center",gap:"8px"}}><img src="/logo-mark.png" alt="" style={{width:"26px",height:"26px",objectFit:"contain",filter:"brightness(0) invert(1)"}}/>GreenMind</h2>
                         <p style={{margin:"4px 0 0",fontSize:"12px",opacity:0.85}}>Financial Planning</p>
                       </div>
                       <div style={{textAlign:"right"}}>

@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
-import { Sparkles, Eye, EyeOff } from "lucide-react"
+import { Eye, EyeOff } from "lucide-react"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -36,12 +36,10 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-xl border border-gray-100">
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-11 h-11 bg-green-500 rounded-2xl flex items-center justify-center shadow-md">
-            <Sparkles className="w-5 h-5 text-white" />
-          </div>
+          <img src="/logo-mark.png" alt="GreenMind" className="w-12 h-12 object-contain" />
           <div>
-            <h1 className="font-bold text-gray-900 text-lg leading-tight">Filtro do Sonho</h1>
-            <p className="text-xs text-gray-400">Controle Financeiro Pessoal</p>
+            <h1 className="font-bold text-lg leading-tight"><span className="text-green-600">Green</span><span className="text-gray-900">Mind</span></h1>
+            <p className="text-xs text-gray-400">Controle financeiro pessoal</p>
           </div>
         </div>
 
@@ -49,7 +47,7 @@ export default function LoginPage() {
           {isSignUp ? "Criar conta" : "Entrar"}
         </h2>
         <p className="text-gray-500 text-sm mb-6">
-          {isSignUp ? "Comece a organizar suas finanças hoje" : "Bem-vinda de volta! ✨"}
+          {isSignUp ? "Comece a organizar suas finanças hoje" : "Bem-vindo(a) de volta!"}
         </p>
 
         <div className="space-y-4">
