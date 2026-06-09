@@ -33,7 +33,7 @@ const emptyInvForm = (today) => ({data:today,desc:"",ref:"",valor:"",investido:f
 const emptyEmpForm = (today) => ({data:today,desc:"",ref:"",parafem:"",valor:"",valorParcela:"",parcelas:"1",dataVenc1:"",dataVencN:"",meioPag:"pix",pago:false});
 
 // ── Theme ──────────────────────────────────────────────────────────────────
-const T = {
+const LIGHT = {
   bg:"#F1F5F9",surface:"#FFFFFF",surfaceAlt:"#F8FAFC",
   border:"#E2E8F0",borderStrong:"#CBD5E1",
   text:"#0F172A",textSub:"#64748B",textMuted:"#94A3B8",
@@ -44,18 +44,34 @@ const T = {
   amber:"#D97706",amberLight:"#FEF3C7",
   indigo:"#4F46E5",indigoLight:"#EEF2FF",
 };
+const DARK = {
+  bg:"#0A1310",surface:"#101B15",surfaceAlt:"#16241D",
+  border:"rgba(255,255,255,0.10)",borderStrong:"rgba(255,255,255,0.20)",
+  text:"#E8F1EC",textSub:"#9DB1A6",textMuted:"#6E847A",
+  purple:"#22C55E",purpleLight:"rgba(34,197,94,0.18)",
+  green:"#34D399",greenLight:"rgba(52,211,153,0.16)",
+  red:"#F87171",redLight:"rgba(248,113,113,0.16)",
+  blue:"#38BDF8",blueLight:"rgba(56,189,248,0.16)",
+  amber:"#FBBF24",amberLight:"rgba(251,191,36,0.16)",
+  indigo:"#A5B4FC",indigoLight:"rgba(165,180,252,0.16)",
+};
+let T = LIGHT;
 const shadow = "0 1px 3px rgba(0,0,0,0.08),0 1px 2px rgba(0,0,0,0.04)";
 const shadowMd = "0 4px 6px rgba(0,0,0,0.07),0 2px 4px rgba(0,0,0,0.04)";
-const card = (ex={}) => ({background:T.surface,border:`1px solid ${T.border}`,borderRadius:"12px",padding:"18px",boxShadow:shadow,marginBottom:"14px",...ex});
-const inpS = {background:T.surface,border:`1.5px solid ${T.borderStrong}`,borderRadius:"9px",padding:"8px 12px",color:T.text,fontSize:"13px",outline:"none",width:"100%",boxSizing:"border-box"};
-const selS = {background:T.surface,border:`1.5px solid ${T.borderStrong}`,borderRadius:"9px",padding:"8px 12px",color:T.text,fontSize:"13px",outline:"none",width:"100%",boxSizing:"border-box"};
-const inpDate = {background:T.surface,border:`1.5px solid ${T.borderStrong}`,borderRadius:"9px",padding:"8px 12px",color:T.text,fontSize:"13px",outline:"none",width:"100%",boxSizing:"border-box"};
+const card = (ex={}) => ({background:T.surface,border:`1px solid ${T.border}`,borderRadius:"14px",padding:"18px",boxShadow:shadow,marginBottom:"14px",...ex});
 const btnP = (col=T.purple) => ({padding:"9px 18px",borderRadius:"9px",border:"none",cursor:"pointer",background:col,color:"#fff",fontWeight:600,fontSize:"13px",boxShadow:`0 2px 8px ${col}40`,whiteSpace:"nowrap"});
 const btnO = (col=T.purple) => ({padding:"8px 16px",borderRadius:"9px",border:`1.5px solid ${col}`,cursor:"pointer",background:"transparent",color:col,fontWeight:600,fontSize:"12px",whiteSpace:"nowrap"});
-const btnG = {padding:"8px 14px",borderRadius:"9px",border:`1px solid ${T.border}`,cursor:"pointer",background:T.surface,color:T.textSub,fontWeight:600,fontSize:"12px"};
-const remB = {background:T.redLight,border:`1px solid #FECACA`,color:T.red,borderRadius:"6px",cursor:"pointer",padding:"3px 8px",fontSize:"11px",fontWeight:600};
-const editB = {background:T.indigoLight,border:`1px solid #C7D2FE`,color:T.indigo,borderRadius:"6px",cursor:"pointer",padding:"3px 8px",fontSize:"11px",fontWeight:600};
-const itemRow = {display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",borderRadius:"10px",marginBottom:"5px",background:T.surfaceAlt,border:`1px solid ${T.border}`};
+let inpS, selS, inpDate, btnG, remB, editB, itemRow;
+function applyTheme(dark){
+  T = dark ? DARK : LIGHT;
+  const inp = {background:T.surface,border:`1.5px solid ${T.borderStrong}`,borderRadius:"9px",padding:"8px 12px",color:T.text,fontSize:"13px",outline:"none",width:"100%",boxSizing:"border-box"};
+  inpS = inp; selS = inp; inpDate = inp;
+  btnG = {padding:"8px 14px",borderRadius:"9px",border:`1px solid ${T.border}`,cursor:"pointer",background:T.surface,color:T.textSub,fontWeight:600,fontSize:"12px"};
+  remB = {background:T.redLight,border:`1px solid ${T.red}55`,color:T.red,borderRadius:"6px",cursor:"pointer",padding:"3px 8px",fontSize:"11px",fontWeight:600};
+  editB = {background:T.indigoLight,border:`1px solid ${T.indigo}55`,color:T.indigo,borderRadius:"6px",cursor:"pointer",padding:"3px 8px",fontSize:"11px",fontWeight:600};
+  itemRow = {display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",borderRadius:"10px",marginBottom:"5px",background:T.surfaceAlt,border:`1px solid ${T.border}`};
+}
+applyTheme(false);
 const chip = (col) => ({display:"inline-flex",padding:"2px 9px",borderRadius:"20px",fontSize:"11px",fontWeight:700,background:`${col}15`,color:col,border:`1px solid ${col}30`});
 const navI = (a) => ({display:"flex",alignItems:"center",gap:"10px",padding:"9px 12px",borderRadius:"10px",cursor:"pointer",color:a?T.purple:T.textSub,background:a?T.purpleLight:"transparent",fontWeight:a?600:400,fontSize:"14px",transition:"all 0.15s"});
 const subNavI = (a) => ({display:"flex",alignItems:"center",gap:"8px",padding:"7px 12px",borderRadius:"8px",cursor:"pointer",color:a?T.purple:T.textSub,background:a?T.purpleLight:"transparent",fontWeight:a?600:400,fontSize:"13px"});
@@ -104,6 +120,42 @@ function FormField({label,children,half}){
     <label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px",fontWeight:500}}>{label}</label>
     {children}
   </div>;
+}
+
+// ── Hero de saldo (estilo GreenMind app) ───────────────────────────────────
+function BalanceHero({recTotal,despTotal,currentMonth,CY}){
+  const [hide,setHide]=useState(false);
+  const saldo = recTotal - despTotal;
+  const taxa = recTotal>0 ? (saldo/recTotal)*100 : 0;
+  const mask=(s)=>hide?"••••••":s;
+  const AUp=<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></svg>;
+  const ADown=<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M6 13l6 6 6-6"/></svg>;
+  const EyeIc=hide
+    ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c7 0 10 8 10 8a18 18 0 0 1-2.16 3.19M6.6 6.6A18 18 0 0 0 2 12s3 8 10 8a9 9 0 0 0 5.4-1.6"/><path d="m2 2 20 20"/></svg>
+    : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-8 10-8 10 8 10 8-3 8-10 8-10-8-10-8Z"/><circle cx="12" cy="12" r="3"/></svg>;
+  return (
+    <div style={{position:"relative",overflow:"hidden",marginBottom:"14px",background:"linear-gradient(160deg,#166534 0%,#0F2419 100%)",color:"#fff",borderRadius:"20px",padding:"20px",boxShadow:"0 24px 44px -20px rgba(15,36,25,.7)"}}>
+      <div style={{position:"absolute",inset:0,opacity:.5,background:"radial-gradient(140px 140px at 88% -8%, rgba(74,222,128,.45), transparent 70%),radial-gradient(180px 160px at 10% 120%, rgba(34,197,94,.30), transparent 70%)"}}/>
+      <div style={{position:"relative",display:"flex",alignItems:"center",justifyContent:"space-between",fontSize:"12.5px",color:"rgba(255,255,255,.75)"}}>
+        <span>Saldo do mês · {MONTHS[currentMonth]} {CY}</span>
+        <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+          <span style={{background:"rgba(74,222,128,.22)",color:"#bbf7d0",fontSize:"11.5px",fontWeight:600,padding:"4px 10px",borderRadius:"9px"}}>{hide?"••":taxa.toFixed(0)+"%"} poupança</span>
+          <button onClick={()=>setHide(h=>!h)} style={{background:"rgba(255,255,255,.14)",border:0,color:"#fff",width:"30px",height:"30px",borderRadius:"9px",display:"grid",placeItems:"center",cursor:"pointer"}}>{EyeIc}</button>
+        </div>
+      </div>
+      <div style={{position:"relative",fontSize:"38px",fontWeight:700,margin:"6px 0 16px",letterSpacing:"-.02em"}}>{hide?"R$ ••••••":fmt(saldo)}</div>
+      <div style={{position:"relative",display:"flex",gap:"10px"}}>
+        <div style={{flex:1,display:"flex",alignItems:"center",gap:"9px",background:"rgba(255,255,255,.10)",borderRadius:"15px",padding:"10px 12px"}}>
+          <span style={{width:"28px",height:"28px",borderRadius:"9px",display:"grid",placeItems:"center",flex:"none",background:"rgba(74,222,128,.30)",color:"#86efac"}}>{AUp}</span>
+          <div><small style={{display:"block",fontSize:"11px",color:"rgba(255,255,255,.72)"}}>Receitas</small><b style={{fontSize:"14.5px",fontWeight:600}}>{mask(fmt(recTotal))}</b></div>
+        </div>
+        <div style={{flex:1,display:"flex",alignItems:"center",gap:"9px",background:"rgba(255,255,255,.10)",borderRadius:"15px",padding:"10px 12px"}}>
+          <span style={{width:"28px",height:"28px",borderRadius:"9px",display:"grid",placeItems:"center",flex:"none",background:"rgba(248,113,113,.26)",color:"#fca5a5"}}>{ADown}</span>
+          <div><small style={{display:"block",fontSize:"11px",color:"rgba(255,255,255,.72)"}}>Despesas</small><b style={{fontSize:"14.5px",fontWeight:600}}>{mask(fmt(despTotal))}</b></div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ── Modal de lançamento ────────────────────────────────────────────────────
@@ -301,6 +353,10 @@ export default function App(){
   const [view, setView] = useState("mes");
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [dark, setDark] = useState(false);
+  useEffect(()=>{ try{ if(localStorage.getItem('gm_theme')==='dark') setDark(true); }catch(e){} },[]);
+  const toggleTheme = () => setDark(d=>{ const n=!d; try{ localStorage.setItem('gm_theme', n?'dark':'light'); }catch(e){} return n; });
+  applyTheme(dark);
   const [showModal, setShowModal] = useState(null); // tipo do modal
   const [editingItem, setEditingItem] = useState(null);
   const [recForm, setRecForm] = useState(emptyRecForm(today));
@@ -880,6 +936,12 @@ Cancelar = Dar baixa só nesta parcela`);
             </h1>
             <p style={{color:T.textSub,fontSize:"13px",margin:"2px 0 0"}}>GreenMind — Financial Planning • {CY}</p>
           </div>
+          <div style={{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}}>
+            <button onClick={toggleTheme} title="Tema claro / escuro" style={{width:"38px",height:"38px",borderRadius:"10px",border:`1px solid ${T.border}`,background:T.surface,color:T.text,cursor:"pointer",display:"grid",placeItems:"center",flexShrink:0}}>
+              {dark
+                ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7"/></svg>
+                : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4 7 7 0 1 0 20 14.5Z"/></svg>}
+            </button>
           {activeSection!=="cartoes"&&activeSection!=="cadastros"&&activeSection!=="sincronizar"&&activeSection!=="mei"&&activeSection!=="buscar"&&activeSection!=="emitir"&&(
             <div style={{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}}>
               {!isMobile&&<div style={{display:"flex",background:T.surfaceAlt,borderRadius:"10px",padding:"3px",border:`1px solid ${T.border}`,gap:"2px"}}>
@@ -904,6 +966,7 @@ Cancelar = Dar baixa só nesta parcela`);
               </div>
             </div>
           )}
+          </div>
         </div>
 
         {/* ── DASHBOARD ── */}
@@ -1060,6 +1123,27 @@ Cancelar = Dar baixa só nesta parcela`);
             {/* ── VISÃO MÊS ── */}
             {view==="mes"&&(
             <div>
+
+            <BalanceHero recTotal={recTotal} despTotal={despTotal} currentMonth={currentMonth} CY={CY}/>
+
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:"10px",marginBottom:"14px"}}>
+              {[
+                {label:"Lançar",sec:"lancamentos",hot:true,ic:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>},
+                {label:"Cartões",sec:"cartoes",ic:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M2.5 9.5h19"/></svg>},
+                {label:"Relatório",sec:"relatorio",ic:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M7 15l4-4 3 2 5-6"/></svg>},
+                {label:"MEI",sec:"mei",ic:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2"/></svg>},
+              ].map(q=>(
+                <button key={q.label} onClick={()=>setActiveSection(q.sec)} style={{
+                  display:"flex",flexDirection:"column",alignItems:"center",gap:"7px",padding:"14px 6px",borderRadius:"16px",cursor:"pointer",
+                  border:q.hot?"0":`1px solid ${T.border}`,
+                  background:q.hot?"linear-gradient(140deg,#4ADE80 0%,#22C55E 42%,#166534 100%)":T.surface,
+                  color:q.hot?"#fff":T.text,
+                  boxShadow:q.hot?"0 12px 24px -12px rgba(34,197,94,.7)":shadow}}>
+                  <span style={{width:"38px",height:"38px",borderRadius:"12px",display:"grid",placeItems:"center",background:q.hot?"rgba(255,255,255,.18)":T.purpleLight,color:q.hot?"#fff":T.purple}}>{q.ic}</span>
+                  <span style={{fontSize:"12px",fontWeight:600}}>{q.label}</span>
+                </button>
+              ))}
+            </div>
 
             <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(2,1fr)":"repeat(4,1fr)",gap:"12px",marginBottom:"12px"}}>
               {[
