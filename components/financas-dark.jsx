@@ -287,7 +287,7 @@ function ItemList({items,col,emptyMsg,onEdit,onRemove,onBaixa,tipo}){
     {items.map(item=>{
       const confirmado=isConfirmado(item);
       return(
-        <div key={item.id} style={{...itemRow,flexWrap:"wrap",gap:"8px",background:confirmado?"#F0FDF4":T.surfaceAlt,border:`1px solid ${confirmado?"#BBF7D0":T.border}`}}>
+        <div key={item.id} style={{...itemRow,flexWrap:"wrap",gap:"8px",background:confirmado?T.greenLight:T.surfaceAlt,border:`1px solid ${confirmado?T.green+"55":T.border}`}}>
           <div style={{flex:1,minWidth:"180px"}}>
             <div style={{display:"flex",alignItems:"center",gap:"6px",flexWrap:"wrap"}}>
               <p style={{color:confirmado?T.green:T.text,fontSize:"13px",fontWeight:600,margin:0,textDecoration:confirmado?"none":"none"}}>{item.desc}</p>
@@ -310,7 +310,7 @@ function ItemList({items,col,emptyMsg,onEdit,onRemove,onBaixa,tipo}){
           <div style={{display:"flex",alignItems:"center",gap:"6px",flexWrap:"wrap"}}>
             <span style={{color:confirmado?T.green:col,fontWeight:700,fontSize:"14px"}}>{fmt(item.valor)}</span>
             <button
-              style={{background:confirmado?"#DCFCE7":"#EFF6FF",border:`1px solid ${confirmado?"#BBF7D0":"#BFDBFE"}`,color:confirmado?T.green:T.blue,borderRadius:"6px",cursor:"pointer",padding:"4px 9px",fontSize:"11px",fontWeight:700,whiteSpace:"nowrap"}}
+              style={{background:confirmado?T.greenLight:T.blueLight,border:`1px solid ${confirmado?T.green+"55":T.blue+"55"}`,color:confirmado?T.green:T.blue,borderRadius:"6px",cursor:"pointer",padding:"4px 9px",fontSize:"11px",fontWeight:700,whiteSpace:"nowrap"}}
               onClick={()=>onBaixa(item.id)}>
               {getBaixaLabel(item)}
             </button>
@@ -321,6 +321,177 @@ function ItemList({items,col,emptyMsg,onEdit,onRemove,onBaixa,tipo}){
       );
     })}
   </div>;
+}
+
+// ── PERFIL & CONFIGURAÇÕES ──────────────────────────────────────────────────
+const PM_ICON = {
+  perfil:"M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM4 21a8 8 0 0 1 16 0",
+  casal:"M9 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM21 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM2 20a4 4 0 0 1 8 0M14 20a4 4 0 0 1 8 0",
+  prefs:"M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 7 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H1a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 2.6 7a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H7a1.6 1.6 0 0 0 1-1.5V1a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V7a1.6 1.6 0 0 0 1.5 1H23a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1Z",
+  regra:"M3 3v18h18M7 14l4-4 3 3 5-6",
+  notif:"M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0",
+  seg:"M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z",
+  plano:"M3 6h18M3 6v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6M3 6l2-3h14l2 3M9 11h6",
+  dados:"M21 5c0 1.66-4 3-9 3S3 6.66 3 5s4-3 9-3 9 1.34 9 3ZM3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5M3 12c0 1.66 4 3 9 3s9-1.34 9-3",
+};
+function PMI({d,s=18,sw=2}){return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round"><path d={d}/></svg>;}
+const PM_SECTIONS = [
+  {k:"perfil",label:"Perfil",ic:"perfil"},
+  {k:"casal",label:"Conta conjunta",ic:"casal",badge:"Casal"},
+  {k:"prefs",label:"Preferências",ic:"prefs"},
+  {k:"regra",label:"Regra 50/30/20",ic:"regra"},
+  {k:"notif",label:"Notificações",ic:"notif"},
+  {k:"seg",label:"Segurança",ic:"seg"},
+  {k:"plano",label:"Plano & assinatura",ic:"plano"},
+  {k:"dados",label:"Dados & privacidade",ic:"dados"},
+];
+function PMToggle({on,onClick}){return <button onClick={onClick} style={{width:"44px",height:"26px",borderRadius:"999px",border:"none",cursor:"pointer",padding:"3px",background:on?T.green:T.borderStrong,transition:".2s",flexShrink:0}}><span style={{display:"block",width:"20px",height:"20px",borderRadius:"50%",background:"#fff",transform:on?"translateX(18px)":"translateX(0)",transition:".2s",boxShadow:"0 1px 3px rgba(0,0,0,.3)"}}/></button>;}
+function PMField({label,children,hint}){return <div style={{marginBottom:"16px"}}><label style={{display:"block",fontSize:"12.5px",fontWeight:600,color:T.textSub,marginBottom:"6px"}}>{label}</label>{children}{hint&&<p style={{fontSize:"11.5px",color:T.textMuted,margin:"5px 0 0"}}>{hint}</p>}</div>;}
+function PMRow({label,desc,right}){return <div style={{display:"flex",alignItems:"center",gap:"14px",padding:"13px 0",borderBottom:`1px solid ${T.border}`}}><div style={{flex:1}}><p style={{fontSize:"14px",fontWeight:500,color:T.text,margin:0}}>{label}</p>{desc&&<p style={{fontSize:"12.5px",color:T.textSub,margin:"2px 0 0",lineHeight:1.4}}>{desc}</p>}</div>{right}</div>;}
+const pmInp = ()=>({width:"100%",background:T.surfaceAlt,border:`1.5px solid ${T.borderStrong}`,borderRadius:"10px",padding:"11px 13px",color:T.text,fontSize:"14px",outline:"none"});
+const pmBtnGreen = ()=>({padding:"11px 20px",borderRadius:"11px",border:"none",cursor:"pointer",background:"linear-gradient(140deg,#22C55E,#166534)",color:"#fff",fontWeight:600,fontSize:"14px",boxShadow:"0 8px 18px -8px rgba(34,197,94,.7)"});
+const pmBtnGhost = ()=>({padding:"10px 18px",borderRadius:"11px",border:`1.5px solid ${T.borderStrong}`,cursor:"pointer",background:"transparent",color:T.text,fontWeight:600,fontSize:"13px"});
+function PMAvatar({name,color,size=44}){const initials=(name||"?").split(" ").map(w=>w[0]).slice(0,2).join("").toUpperCase();return <div style={{width:size,height:size,borderRadius:"50%",background:color,color:"#fff",display:"grid",placeItems:"center",fontWeight:700,fontSize:size*0.36+"px",flexShrink:0,boxShadow:"0 2px 8px rgba(0,0,0,.18)"}}>{initials}</div>;}
+
+function PMPerfil({user}){
+  const nome=user?.name||"Você"; const email=user?.email||"—";
+  return <div>
+    <div style={{display:"flex",alignItems:"center",gap:"16px",marginBottom:"22px"}}>
+      <div style={{position:"relative"}}><PMAvatar name={nome} color="#166534" size={72}/><button style={{position:"absolute",bottom:-2,right:-2,width:"26px",height:"26px",borderRadius:"50%",border:`2px solid ${T.surface}`,background:T.green,color:"#fff",cursor:"pointer",display:"grid",placeItems:"center"}}><PMI d="M12 5v14M5 12h14" s={13}/></button></div>
+      <div><p style={{fontSize:"18px",fontWeight:700,color:T.text,margin:0}}>{nome}</p><p style={{fontSize:"13px",color:T.textSub,margin:"3px 0 0"}}>{email}</p></div>
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
+      <PMField label="Nome"><input style={pmInp()} defaultValue={nome}/></PMField>
+      <PMField label="Telefone"><input style={pmInp()} placeholder="(00) 00000-0000"/></PMField>
+    </div>
+    <PMField label="E-mail" hint="Usado para login e para receber convites."><input style={pmInp()} defaultValue={email}/></PMField>
+    <div style={{height:"1px",background:T.border,margin:"8px 0 18px"}}/>
+    <p style={{fontSize:"13px",fontWeight:700,color:T.text,margin:"0 0 12px"}}>Alterar senha</p>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
+      <PMField label="Senha atual"><input type="password" style={pmInp()} placeholder="••••••••"/></PMField>
+      <PMField label="Nova senha"><input type="password" style={pmInp()} placeholder="Mínimo 8 caracteres"/></PMField>
+    </div>
+    <div style={{display:"flex",justifyContent:"flex-end",gap:"10px",marginTop:"8px"}}><button style={pmBtnGhost()}>Cancelar</button><button style={pmBtnGreen()}>Salvar alterações</button></div>
+  </div>;
+}
+function PMCasal(){
+  const [share,setShare]=useState({lanc:true,cartoes:true,metas:true,mei:false});
+  const [perms,setPerms]=useState({lucas:"editar"});
+  const PERM={admin:{label:"Administrador",desc:"Acesso total: lança, edita, exclui, convida e gerencia o plano",c:T.green,bg:T.greenLight},editar:{label:"Pode editar",desc:"Lança, edita e exclui — mas não gerencia membros nem o plano",c:T.blue,bg:T.blueLight},ver:{label:"Somente ver",desc:"Visualiza tudo, mas não pode lançar nem alterar nada",c:T.amber,bg:T.amberLight}};
+  return <div>
+    <div style={{background:"linear-gradient(160deg,#166534,#0F2419)",borderRadius:"18px",padding:"20px",color:"#fff",marginBottom:"18px",position:"relative",overflow:"hidden"}}>
+      <div style={{position:"absolute",inset:0,opacity:.5,background:"radial-gradient(130px 130px at 90% -10%, rgba(74,222,128,.5), transparent 70%)"}}/>
+      <div style={{position:"relative",display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"16px"}}>
+        <div><p style={{fontSize:"15px",fontWeight:700,margin:0}}>Conta da família</p><p style={{fontSize:"12.5px",color:"rgba(255,255,255,.7)",margin:"3px 0 0"}}>2 pessoas · sincronizadas</p></div>
+        <span style={{display:"inline-flex",alignItems:"center",gap:"7px",background:"rgba(74,222,128,.22)",color:"#bbf7d0",fontSize:"11.5px",fontWeight:600,padding:"6px 12px",borderRadius:"999px"}}><span style={{width:"7px",height:"7px",borderRadius:"50%",background:"#4ADE80",boxShadow:"0 0 0 3px rgba(74,222,128,.3)"}}/>Tempo real</span>
+      </div>
+      <div style={{position:"relative",display:"flex",alignItems:"center"}}><PMAvatar name="Thayse" color="#22C55E" size={46}/><div style={{marginLeft:"-12px"}}><PMAvatar name="Lucas" color="#0EA5E9" size={46}/></div><p style={{marginLeft:"14px",fontSize:"12.5px",color:"rgba(255,255,255,.85)"}}>Última atualização agora há pouco</p></div>
+    </div>
+    <p style={{fontSize:"13px",fontWeight:700,color:T.text,margin:"0 0 8px"}}>Membros & permissões</p>
+    <div style={{display:"flex",alignItems:"center",gap:"12px",padding:"12px",background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:"12px",marginBottom:"8px"}}>
+      <PMAvatar name="Thayse" color="#166534" size={40}/><div style={{flex:1,minWidth:0}}><p style={{fontSize:"14px",fontWeight:600,color:T.text,margin:0}}>Thayse <span style={{fontSize:"11px",color:T.green,fontWeight:600}}>· você</span></p><p style={{fontSize:"12px",color:T.textSub,margin:"2px 0 0"}}>thayse@email.com</p></div>
+      <span style={{fontSize:"11.5px",fontWeight:600,color:T.green,background:T.greenLight,border:`1px solid ${T.green}40`,padding:"5px 10px",borderRadius:"8px",flexShrink:0}}>Administrador</span>
+    </div>
+    <div style={{padding:"12px",background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:"12px",marginBottom:"8px"}}>
+      <div style={{display:"flex",alignItems:"center",gap:"12px"}}><PMAvatar name="Lucas Silva" color="#0EA5E9" size={40}/><div style={{flex:1,minWidth:0}}><p style={{fontSize:"14px",fontWeight:600,color:T.text,margin:0}}>Lucas Silva</p><p style={{fontSize:"12px",color:T.textSub,margin:"2px 0 0"}}>lucas@email.com</p></div></div>
+      <div style={{display:"flex",gap:"5px",marginTop:"12px",background:T.surface,border:`1px solid ${T.border}`,borderRadius:"11px",padding:"4px"}}>
+        {["admin","editar","ver"].map(p=>{const on=perms.lucas===p;const P=PERM[p];return <button key={p} onClick={()=>setPerms(s=>({...s,lucas:p}))} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:"7px",border:"none",cursor:"pointer",fontSize:"12.5px",fontWeight:600,padding:"9px 8px",borderRadius:"8px",background:on?P.bg:"transparent",color:on?P.c:T.textSub}}><span style={{width:"7px",height:"7px",borderRadius:"50%",background:on?P.c:T.borderStrong}}/>{P.label}</button>;})}
+      </div>
+      <p style={{fontSize:"12px",color:T.textSub,margin:"10px 2px 0",lineHeight:1.45}}>{PERM[perms.lucas].desc}</p>
+      {perms.lucas==="ver"&&<p style={{fontSize:"11.5px",color:T.amber,margin:"6px 2px 0",fontWeight:500}}>👀 O Lucas verá tudo em tempo real, mas os botões de lançar e editar ficam ocultos pra ele.</p>}
+    </div>
+    <div style={{border:`1.5px dashed ${T.borderStrong}`,borderRadius:"12px",padding:"16px",marginTop:"6px"}}>
+      <p style={{fontSize:"13.5px",fontWeight:600,color:T.text,margin:"0 0 4px"}}>Convidar alguém</p>
+      <p style={{fontSize:"12.5px",color:T.textSub,margin:"0 0 12px",lineHeight:1.45}}>A pessoa recebe um e-mail para baixar o app. Você define a permissão dela ao convidar.</p>
+      <div style={{display:"flex",gap:"8px",marginBottom:"8px"}}><input style={{...pmInp(),flex:1}} placeholder="email@exemplo.com"/><select style={{...pmInp(),width:"auto"}} defaultValue="editar"><option value="admin">Administrador</option><option value="editar">Pode editar</option><option value="ver">Somente ver</option></select></div>
+      <button style={{...pmBtnGreen(),width:"100%"}}>Enviar convite</button>
+    </div>
+    <p style={{fontSize:"13px",fontWeight:700,color:T.text,margin:"20px 0 4px"}}>O que vocês compartilham</p>
+    <PMRow label="Lançamentos & saldo" desc="Receitas, despesas e o saldo do mês" right={<PMToggle on={share.lanc} onClick={()=>setShare(s=>({...s,lanc:!s.lanc}))}/>}/>
+    <PMRow label="Cartões & faturas" desc="Limites, faturas e parcelas" right={<PMToggle on={share.cartoes} onClick={()=>setShare(s=>({...s,cartoes:!s.cartoes}))}/>}/>
+    <PMRow label="Metas" desc="Objetivos e progresso" right={<PMToggle on={share.metas} onClick={()=>setShare(s=>({...s,metas:!s.metas}))}/>}/>
+    <PMRow label="MEI de cada um" desc="Mantenha o MEI individual privado se preferir" right={<PMToggle on={share.mei} onClick={()=>setShare(s=>({...s,mei:!s.mei}))}/>}/>
+  </div>;
+}
+function PMPrefs({dark,onToggleTheme}){
+  const [moeda,setMoeda]=useState("BRL"),[fech,setFech]=useState("1");
+  return <div>
+    <p style={{fontSize:"13px",fontWeight:700,color:T.text,margin:"0 0 4px"}}>Aparência</p>
+    <PMRow label="Tema" desc="Claro ou escuro" right={<div style={{display:"flex",gap:"4px",background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:"10px",padding:"3px"}}>{[["light","Claro"],["dark","Escuro"]].map(([k,l])=>{const on=(k==="dark")===dark;return <button key={k} onClick={()=>{if(on)return;onToggleTheme();}} style={{border:"none",cursor:"pointer",fontSize:"12.5px",fontWeight:600,padding:"7px 14px",borderRadius:"8px",background:on?T.surface:"transparent",color:on?T.text:T.textSub,boxShadow:on?"0 1px 3px rgba(0,0,0,.15)":"none"}}>{l}</button>;})}</div>}/>
+    <p style={{fontSize:"13px",fontWeight:700,color:T.text,margin:"22px 0 4px"}}>Regional</p>
+    <PMRow label="Moeda" right={<select value={moeda} onChange={e=>setMoeda(e.target.value)} style={{...pmInp(),width:"auto"}}><option value="BRL">Real (R$)</option><option value="USD">Dólar (US$)</option><option value="EUR">Euro (€)</option></select>}/>
+    <PMRow label="Dia de fechamento do mês" desc="Quando seu mês financeiro vira (ex.: dia do salário)" right={<select value={fech} onChange={e=>setFech(e.target.value)} style={{...pmInp(),width:"auto"}}>{[1,5,10,15,20,25].map(d=><option key={d} value={d}>Dia {d}</option>)}</select>}/>
+    <PMRow label="Começo da semana" right={<select style={{...pmInp(),width:"auto"}}><option>Domingo</option><option>Segunda</option></select>}/>
+  </div>;
+}
+function PMRegra(){
+  const [v,setV]=useState({ess:50,pes:30,inv:20});const total=v.ess+v.pes+v.inv;
+  const bars=[["ess","Essencial","#38BDF8","Moradia, contas, mercado"],["pes","Pessoal","#FBBF24","Lazer, roupas, hobbies"],["inv","Investir & metas","#22C55E","Poupança, reserva, sonhos"]];
+  return <div>
+    <p style={{fontSize:"13.5px",color:T.textSub,margin:"0 0 18px",lineHeight:1.5}}>O padrão é <b style={{color:T.text}}>50/30/20</b>, mas você pode ajustar para o que faz sentido pra vocês (ex.: 60/20/20).</p>
+    {bars.map(([k,l,c,d])=>(<div key={k} style={{marginBottom:"18px"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}><span style={{display:"flex",alignItems:"center",gap:"9px",fontSize:"14px",fontWeight:500,color:T.text}}><span style={{width:"11px",height:"11px",borderRadius:"3px",background:c}}/>{l} <span style={{fontSize:"12px",color:T.textMuted,fontWeight:400}}>· {d}</span></span><span style={{fontSize:"15px",fontWeight:700,color:T.text}}>{v[k]}%</span></div><input type="range" min="0" max="100" value={v[k]} onChange={e=>setV(s=>({...s,[k]:+e.target.value}))} style={{width:"100%",accentColor:c}}/></div>))}
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 14px",borderRadius:"11px",background:total===100?T.greenLight:T.redLight,border:`1px solid ${total===100?T.green+"40":T.red+"40"}`,marginTop:"4px"}}><span style={{fontSize:"13px",fontWeight:600,color:total===100?T.green:T.red}}>{total===100?"✓ Soma 100% — perfeito":`Soma ${total}% — ajuste para 100%`}</span><button onClick={()=>setV({ess:50,pes:30,inv:20})} style={{...pmBtnGhost(),padding:"6px 12px",fontSize:"12px"}}>Restaurar padrão</button></div>
+  </div>;
+}
+function PMNotif(){
+  const [n,setN]=useState({fatura:true,lancar:true,meta:true,resumo:true,mei:true,casal:true});
+  const items=[["fatura","Vencimento de faturas","Avisa 3 dias antes de cada fatura"],["lancar","Lembrete de lançar","Toda noite, se você não registrou nada"],["meta","Meta atingida","Quando você bate um objetivo 🎉"],["resumo","Resumo mensal","No 1º dia do mês, um balanço do mês anterior"],["mei","Alerta de limite MEI","Quando a projeção passar de 80% do limite"],["casal","Atividade do casal","Quando o Lucas adiciona ou edita algo"]];
+  return <div>{items.map(([k,l,d])=><PMRow key={k} label={l} desc={d} right={<PMToggle on={n[k]} onClick={()=>setN(s=>({...s,[k]:!s[k]}))}/>}/>)}</div>;
+}
+function PMSeg(){
+  const [bio,setBio]=useState(true),[twofa,setTwofa]=useState(false);
+  return <div>
+    <PMRow label="Desbloqueio por biometria" desc="Use Face ID / digital ao abrir o app" right={<PMToggle on={bio} onClick={()=>setBio(!bio)}/>}/>
+    <PMRow label="PIN de 4 dígitos" desc="Alternativa à biometria" right={<button style={pmBtnGhost()}>Configurar</button>}/>
+    <PMRow label="Verificação em duas etapas" desc="Código extra por e-mail ao entrar em um aparelho novo" right={<PMToggle on={twofa} onClick={()=>setTwofa(!twofa)}/>}/>
+    <p style={{fontSize:"13px",fontWeight:700,color:T.text,margin:"20px 0 8px"}}>Sessões ativas</p>
+    {[["iPhone 15 · Thayse","São Paulo · agora",true],["Chrome · Windows","São Paulo · há 2 dias",false]].map(([d,s,cur])=>(<div key={d} style={{display:"flex",alignItems:"center",gap:"12px",padding:"11px 0",borderBottom:`1px solid ${T.border}`}}><span style={{color:T.textSub}}><PMI d="M5 3h14a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1ZM12 18h.01"/></span><div style={{flex:1}}><p style={{fontSize:"13.5px",fontWeight:500,color:T.text,margin:0}}>{d}</p><p style={{fontSize:"12px",color:T.textSub,margin:"2px 0 0"}}>{s}</p></div>{cur?<span style={{fontSize:"11.5px",color:T.green,fontWeight:600}}>Atual</span>:<button style={{background:"none",border:"none",color:T.red,fontSize:"12.5px",fontWeight:600,cursor:"pointer"}}>Encerrar</button>}</div>))}
+  </div>;
+}
+function PMPlano(){
+  return <div>
+    <div style={{background:"linear-gradient(140deg,#4ADE80,#22C55E 42%,#166534)",borderRadius:"18px",padding:"22px",color:"#fff",marginBottom:"18px"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}><div><p style={{fontSize:"12px",fontWeight:700,letterSpacing:".1em",textTransform:"uppercase",opacity:.85,margin:0}}>Plano atual</p><p style={{fontSize:"26px",fontWeight:700,margin:"4px 0 0"}}>Família</p></div><span style={{background:"rgba(255,255,255,.2)",padding:"6px 12px",borderRadius:"999px",fontSize:"12px",fontWeight:600}}>Ativo</span></div><p style={{fontSize:"13px",opacity:.9,margin:"10px 0 0"}}>R$ 69/mês · 2 MEIs incluídos</p></div>
+    <PMRow label="Forma de pagamento" desc="Mastercard •••• 4821" right={<button style={pmBtnGhost()}>Alterar</button>}/>
+    <PMRow label="Histórico de faturas" desc="Baixe seus recibos" right={<button style={pmBtnGhost()}>Ver</button>}/>
+    <PMRow label="Trocar de plano" desc="Essencial · Pro · Família" right={<button style={pmBtnGhost()}>Comparar</button>}/>
+    <button style={{background:"none",border:"none",color:T.red,fontSize:"13px",fontWeight:600,cursor:"pointer",marginTop:"14px",padding:0}}>Cancelar assinatura</button>
+  </div>;
+}
+function PMDados({onExport}){
+  return <div>
+    <PMRow label="Backup automático" desc="Seus dados ficam salvos na nuvem com segurança" right={<PMToggle on={true} onClick={()=>{}}/>}/>
+    <PMRow label="Exportar meus dados" desc="Baixe tudo em JSON (LGPD)" right={<button style={pmBtnGhost()} onClick={onExport}>Exportar</button>}/>
+    <div style={{background:T.redLight,border:`1px solid ${T.red}30`,borderRadius:"12px",padding:"16px",marginTop:"18px"}}><p style={{fontSize:"13.5px",fontWeight:700,color:T.red,margin:"0 0 4px"}}>Zona de perigo</p><p style={{fontSize:"12.5px",color:T.textSub,margin:"0 0 12px",lineHeight:1.45}}>Excluir a conta apaga seus dados permanentemente. Numa conta de casal, o Lucas mantém os dados dele.</p><div style={{display:"flex",gap:"10px",flexWrap:"wrap"}}><button style={{padding:"9px 16px",borderRadius:"10px",border:`1.5px solid ${T.red}`,background:"transparent",color:T.red,fontWeight:600,fontSize:"13px",cursor:"pointer"}}>Sair da conta conjunta</button><button style={{padding:"9px 16px",borderRadius:"10px",border:"none",background:T.red,color:"#fff",fontWeight:600,fontSize:"13px",cursor:"pointer"}}>Excluir minha conta</button></div></div>
+  </div>;
+}
+function ProfileModal({dark,onToggleTheme,onClose,onLogout,onExport,user,isMobile}){
+  const [sec,setSec]=useState("perfil");
+  const Body={perfil:PMPerfil,casal:PMCasal,prefs:PMPrefs,regra:PMRegra,notif:PMNotif,seg:PMSeg,plano:PMPlano,dados:PMDados}[sec];
+  const cur=PM_SECTIONS.find(s=>s.k===sec);
+  const subt={perfil:"Seus dados pessoais e acesso",casal:"Compartilhe tudo com quem você ama",prefs:"Deixe o app do seu jeito",regra:"Personalize seu orçamento",notif:"Escolha o que quer receber",seg:"Proteja sua conta",plano:"Gerencie sua assinatura",dados:"Controle total dos seus dados"}[sec];
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:700,background:"rgba(0,0,0,.5)",backdropFilter:"blur(5px)",display:"flex",alignItems:"center",justifyContent:"center",padding:isMobile?"0":"20px"}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:T.surface,borderRadius:isMobile?"0":"22px",width:"860px",maxWidth:"96vw",height:isMobile?"100vh":"640px",maxHeight:isMobile?"100vh":"92vh",display:"flex",flexDirection:isMobile?"column":"row",overflow:"hidden",boxShadow:"0 40px 90px -30px rgba(0,0,0,.6)",border:`1px solid ${T.border}`}}>
+        {/* rail */}
+        <div style={{width:isMobile?"100%":"248px",flexShrink:0,background:T.surfaceAlt,borderRight:isMobile?"none":`1px solid ${T.border}`,borderBottom:isMobile?`1px solid ${T.border}`:"none",padding:isMobile?"10px":"22px 14px",display:"flex",flexDirection:isMobile?"row":"column",gap:isMobile?"6px":"0",overflowX:isMobile?"auto":"visible"}}>
+          {!isMobile&&<div style={{display:"flex",alignItems:"center",gap:"10px",padding:"0 8px 18px"}}><img src="/logo-mark.png" alt="" style={{width:"30px",height:"30px",objectFit:"contain"}}/><span style={{fontWeight:700,fontSize:"15px",color:T.text}}><span style={{color:T.forest}}>Green</span>Mind</span></div>}
+          <div style={{display:"flex",flexDirection:isMobile?"row":"column",gap:isMobile?"6px":"2px",flex:1,overflowY:isMobile?"visible":"auto",overflowX:isMobile?"auto":"visible"}}>
+            {PM_SECTIONS.map(s=>{const on=sec===s.k;return <button key={s.k} onClick={()=>setSec(s.k)} style={{display:"flex",alignItems:"center",gap:"11px",padding:"10px 12px",borderRadius:"10px",border:"none",cursor:"pointer",textAlign:"left",whiteSpace:"nowrap",background:on?(dark?"rgba(52,211,153,.16)":"#fff"):"transparent",color:on?T.forest:T.textSub,fontWeight:on?600:500,fontSize:"13.5px",boxShadow:on&&!dark?"0 1px 3px rgba(0,0,0,.08)":"none",flexShrink:0}}><span style={{color:on?T.forest:T.textMuted,display:"grid",placeItems:"center"}}><PMI d={PM_ICON[s.ic]} s={17}/></span>{!isMobile&&<span style={{flex:1}}>{s.label}</span>}{!isMobile&&s.badge&&<span style={{fontSize:"10px",fontWeight:700,color:T.forest,background:dark?"rgba(52,211,153,.16)":"#DCFCE7",padding:"2px 7px",borderRadius:"6px"}}>{s.badge}</span>}{isMobile&&<span>{s.label}</span>}</button>;})}
+          </div>
+          {!isMobile&&<button onClick={onLogout} style={{display:"flex",alignItems:"center",gap:"11px",padding:"11px 12px",borderRadius:"10px",border:"none",cursor:"pointer",background:"transparent",color:T.red,fontWeight:600,fontSize:"13.5px",marginTop:"8px"}}><PMI d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" s={17}/>Sair</button>}
+        </div>
+        {/* content */}
+        <div style={{flex:1,display:"flex",flexDirection:"column",minWidth:0}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"18px 22px",borderBottom:`1px solid ${T.border}`}}>
+            <div><h2 style={{fontSize:"18px",fontWeight:700,color:T.text,margin:0}}>{cur.label}</h2><p style={{fontSize:"12.5px",color:T.textSub,margin:"2px 0 0"}}>{subt}</p></div>
+            <button onClick={onClose} style={{width:"36px",height:"36px",borderRadius:"10px",border:`1px solid ${T.border}`,background:T.surface,color:T.textSub,cursor:"pointer",display:"grid",placeItems:"center",flexShrink:0}}><PMI d="M18 6 6 18M6 6l12 12"/></button>
+          </div>
+          <div style={{flex:1,overflowY:"auto",padding:"22px"}}><Body user={user} dark={dark} onToggleTheme={onToggleTheme} onExport={onExport}/></div>
+          {isMobile&&<div style={{padding:"12px 22px",borderTop:`1px solid ${T.border}`}}><button onClick={onLogout} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:"8px",padding:"12px",borderRadius:"11px",border:`1px solid ${T.red}40`,cursor:"pointer",background:T.redLight,color:T.red,fontWeight:600,fontSize:"14px"}}><PMI d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" s={17}/>Sair da conta</button></div>}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ── Main App ───────────────────────────────────────────────────────────────
@@ -357,6 +528,11 @@ export default function App(){
   useEffect(()=>{ try{ if(localStorage.getItem('gm_theme')==='dark') setDark(true); }catch(e){} },[]);
   const toggleTheme = () => setDark(d=>{ const n=!d; try{ localStorage.setItem('gm_theme', n?'dark':'light'); }catch(e){} return n; });
   applyTheme(dark);
+  const [showProfile, setShowProfile] = useState(false);
+  const [authUser, setAuthUser] = useState(null);
+  useEffect(()=>{ (async()=>{ try{ const supabase=createClient(); const {data}=await supabase.auth.getUser(); if(data?.user){ const u=data.user; setAuthUser({ email:u.email, name:(u.user_metadata&&(u.user_metadata.name||u.user_metadata.full_name))||(u.email?u.email.split("@")[0]:"Você") }); } }catch(e){} })(); },[]);
+  const handleLogout = async()=>{ try{ const supabase=createClient(); await supabase.auth.signOut(); }catch(e){} window.location.href="/login"; };
+  const exportData = ()=>{ const b=new Blob([JSON.stringify({allYearsData,cartoes,usoCartoes,pagamentos,cadastros,mei_data:meiData},null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=`greenmind_dados.json`;a.click();showToast("Exportado!"); };
   const [showModal, setShowModal] = useState(null); // tipo do modal
   const [editingItem, setEditingItem] = useState(null);
   const [recForm, setRecForm] = useState(emptyRecForm(today));
@@ -942,6 +1118,10 @@ Cancelar = Dar baixa só nesta parcela`);
                 ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7"/></svg>
                 : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4 7 7 0 1 0 20 14.5Z"/></svg>}
             </button>
+            <button onClick={()=>setShowProfile(true)} title="Perfil & configurações" style={{display:"flex",alignItems:"center",gap:"8px",height:"38px",padding:"0 10px 0 4px",borderRadius:"999px",border:`1px solid ${T.border}`,background:T.surface,cursor:"pointer",flexShrink:0}}>
+              <span style={{width:"30px",height:"30px",borderRadius:"50%",background:"linear-gradient(140deg,#22C55E,#166534)",color:"#fff",display:"grid",placeItems:"center",fontWeight:700,fontSize:"12px"}}>{((authUser?.name||"V").trim()[0]||"V").toUpperCase()}</span>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={T.textSub} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
           {activeSection!=="cartoes"&&activeSection!=="cadastros"&&activeSection!=="sincronizar"&&activeSection!=="mei"&&activeSection!=="buscar"&&activeSection!=="emitir"&&(
             <div style={{display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}}>
               {!isMobile&&<div style={{display:"flex",background:T.surfaceAlt,borderRadius:"10px",padding:"3px",border:`1px solid ${T.border}`,gap:"2px"}}>
@@ -973,9 +1153,9 @@ Cancelar = Dar baixa só nesta parcela`);
         {activeSection==="dashboard"&&(
           <div>
             {/* Alert sempre visível */}
-            {totalAtrasado>0&&<div style={{background:T.redLight,border:"1px solid #FECACA",borderRadius:"10px",padding:"12px 16px",marginBottom:"16px",display:"flex",alignItems:"center",gap:"12px"}}>
+            {totalAtrasado>0&&<div style={{background:T.redLight,border:`1px solid ${T.red}55`,borderRadius:"10px",padding:"12px 16px",marginBottom:"16px",display:"flex",alignItems:"center",gap:"12px"}}>
               <span style={{fontSize:"20px"}}>⚠️</span>
-              <div><p style={{color:T.red,fontWeight:700,fontSize:"13px",margin:0}}>Faturas em atraso!</p><p style={{color:"#B91C1C",fontSize:"12px",margin:"2px 0 0"}}>Total não pago de meses anteriores: <strong>{fmt(totalAtrasado)}</strong></p></div>
+              <div><p style={{color:T.red,fontWeight:700,fontSize:"13px",margin:0}}>Faturas em atraso!</p><p style={{color:T.red,fontSize:"12px",margin:"2px 0 0"}}>Total não pago de meses anteriores: <strong>{fmt(totalAtrasado)}</strong></p></div>
             </div>}
 
             {/* ── VISÃO ANO ── */}
@@ -1215,7 +1395,7 @@ Cancelar = Dar baixa só nesta parcela`);
                 {proximasFaturas.length===0?<p style={{color:T.textMuted,fontSize:"12px"}}>✓ Sem faturas pendentes nos próximos meses.</p>:(
                   <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
                     {proximasFaturas.map(f=>(
-                      <div key={f.month} style={{background:f.pago?T.greenLight:T.amberLight,border:`1px solid ${f.pago?"#BBF7D0":"#FDE68A"}`,borderRadius:"10px",padding:"10px 14px",minWidth:"110px"}}>
+                      <div key={f.month} style={{background:f.pago?T.greenLight:T.amberLight,border:`1px solid ${f.pago?T.green+"55":T.amber+"55"}`,borderRadius:"10px",padding:"10px 14px",minWidth:"110px"}}>
                         <p style={{fontSize:"11px",fontWeight:700,color:f.pago?T.green:T.amber,margin:"0 0 3px"}}>{MONTHS[f.month]}</p>
                         <p style={{fontSize:"16px",fontWeight:700,color:f.pago?T.green:T.amber,margin:0}}>{fmt(f.total)}</p>
                         <p style={{fontSize:"10px",color:T.textSub,margin:"2px 0 0"}}>{f.pago?"✓ Pago":"Pendente"}</p>
@@ -1311,7 +1491,7 @@ Cancelar = Dar baixa só nesta parcela`);
         {/* ── LANÇAMENTOS ── */}
         {activeSection==="lancamentos"&&(
           <div>
-            <div style={{...card({padding:"12px 16px",marginBottom:"14px"}),background:T.purpleLight,border:`1px solid #DDD6FE`}}>
+            <div style={{...card({padding:"12px 16px",marginBottom:"14px"}),background:T.purpleLight,border:`1px solid ${T.purple}33`}}>
               <p style={{color:T.purple,fontSize:"13px",margin:0}}>📅 Lançamentos de <strong>{MONTHS[currentMonth]} {CY}</strong></p>
             </div>
             <div style={{display:"flex",gap:"6px",marginBottom:"16px",flexWrap:"wrap"}}>
@@ -1630,7 +1810,7 @@ Cancelar = Dar baixa só nesta parcela`);
                               return <td key={m} style={{padding:"8px 10px"}}>
                                 {faturaTab==="apagar"&&v>0?<div style={{display:"flex",flexDirection:"column",gap:"3px",alignItems:"center"}}>
                                   {isPago(c.id,CY,m)?(
-                                    <button style={{background:"#DCFCE7",border:"1px solid #BBF7D0",color:T.green,borderRadius:"5px",padding:"2px 8px",fontSize:"10px",fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}} onClick={()=>abrirPagamentoModal(c.id,CY,m)}>
+                                    <button style={{background:T.greenLight,border:`1px solid ${T.green}55`,color:T.green,borderRadius:"5px",padding:"2px 8px",fontSize:"10px",fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}} onClick={()=>abrirPagamentoModal(c.id,CY,m)}>
                                       ✓ {getDataPagamento(c.id,CY,m)||"Pago"}
                                     </button>
                                   ):isPagoParcial(c.id,CY,m)?(
@@ -1641,7 +1821,7 @@ Cancelar = Dar baixa só nesta parcela`);
                                       <span style={{fontSize:"9px",color:T.red}}>Saldo: {fmt(getSaldoDevedor(c.id,CY,m))}</span>
                                     </div>
                                   ):(
-                                    <button style={{background:"#FEE2E2",border:"1px solid #FECACA",color:T.red,borderRadius:"5px",padding:"2px 8px",fontSize:"10px",fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}} onClick={()=>abrirPagamentoModal(c.id,CY,m)}>
+                                    <button style={{background:T.redLight,border:`1px solid ${T.red}55`,color:T.red,borderRadius:"5px",padding:"2px 8px",fontSize:"10px",fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}} onClick={()=>abrirPagamentoModal(c.id,CY,m)}>
                                       💳 {fmt(v)}
                                     </button>
                                   )}
@@ -2495,7 +2675,7 @@ Cancelar = Dar baixa só nesta parcela`);
               {meiTab==="anual"&&(
                 <div>
                   {/* Seletor de ano próprio do MEI */}
-                  <div style={{...card({marginBottom:"14px",padding:"12px 16px"}),background:T.purpleLight,border:`1px solid #DDD6FE`}}>
+                  <div style={{...card({marginBottom:"14px",padding:"12px 16px"}),background:T.purpleLight,border:`1px solid ${T.purple}33`}}>
                     <div style={{display:"flex",alignItems:"center",gap:"12px",flexWrap:"wrap",justifyContent:"space-between"}}>
                       <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
                         <button style={{...btnG,padding:"5px 12px"}} onClick={()=>setMeiViewYear(y=>y-1)}>‹</button>
@@ -2514,11 +2694,11 @@ Cancelar = Dar baixa só nesta parcela`);
                   </div>
                   {/* Alert projeção */}
                   {meis.some(m=>projecaoAnual(m.id)>getLimiteEfetivo(m,meiViewYear))&&(
-                    <div style={{background:T.redLight,border:"1px solid #FECACA",borderRadius:"10px",padding:"12px 16px",marginBottom:"14px",display:"flex",alignItems:"center",gap:"12px"}}>
+                    <div style={{background:T.redLight,border:`1px solid ${T.red}55`,borderRadius:"10px",padding:"12px 16px",marginBottom:"14px",display:"flex",alignItems:"center",gap:"12px"}}>
                       <span style={{fontSize:"22px"}}>🚨</span>
                       <div>
                         <p style={{color:T.red,fontWeight:700,fontSize:"13px",margin:0}}>Projeção acima do limite MEI!</p>
-                        <p style={{color:"#B91C1C",fontSize:"12px",margin:"2px 0 0"}}>
+                        <p style={{color:T.red,fontSize:"12px",margin:"2px 0 0"}}>
                           {meis.filter(m=>projecaoAnual(m.id)>getLimiteEfetivo(m,meiViewYear)).map(m=>`${m.nome}: projeção ${fmt(projecaoAnual(m.id))} (limite ${fmt(getLimiteEfetivo(m,meiViewYear))})`).join(" • ")}
                         </p>
                       </div>
@@ -2589,13 +2769,13 @@ Cancelar = Dar baixa só nesta parcela`);
                     const limFam=meis.reduce((s,m)=>s+getLimiteEfetivo(m,meiViewYear),0);
                     const pctFam=(totalFam/limFam)*100;
                     return(
-                      <div style={{...card({marginBottom:"14px"}),background:"linear-gradient(135deg,#F0FDF4,#DCFCE7)",border:"1px solid #BBF7D0"}}>
+                      <div style={{...card({marginBottom:"14px"}),background:T.greenLight,border:`1px solid ${T.green}40`}}>
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px"}}>
                           <p style={{fontSize:"14px",fontWeight:700,color:T.green,margin:0}}>🏠 Consolidado Família</p>
                           <span style={{fontSize:"13px",color:T.textSub}}>Limite total: {fmt(limFam)}</span>
                         </div>
                         <p style={{fontSize:"28px",fontWeight:700,color:T.green,margin:"0 0 8px"}}>{fmt(totalFam)}</p>
-                        <div style={{height:12,background:"rgba(255,255,255,0.6)",borderRadius:6,border:"1px solid #BBF7D0",overflow:"hidden",display:"flex",width:"100%"}}>
+                        <div style={{height:12,background:"rgba(255,255,255,0.6)",borderRadius:6,border:`1px solid ${T.green}40`,overflow:"hidden",display:"flex",width:"100%"}}>
                           {meis.map(m=>{
                             const w=limFam>0?Math.min(100,(faturadoAno(m.id)/limFam)*100):0;
                             return w>0?<div key={m.id} style={{height:"12px",width:`${w}%`,background:m.cor,flexShrink:0}}/>:null;
@@ -2896,12 +3076,12 @@ Cancelar = Dar baixa só nesta parcela`);
 
                     {/* Métricas */}
                     <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(3,1fr)":"repeat(3,1fr)",gap:"6px",marginBottom:"14px"}}>
-                      <div style={{background:T.greenLight,borderRadius:"8px",padding:"10px",border:"1px solid #BBF7D0"}}>
+                      <div style={{background:T.greenLight,borderRadius:"8px",padding:"10px",border:`1px solid ${T.green}55`}}>
                         <p style={{fontSize:"10px",color:T.green,fontWeight:600,textTransform:"uppercase",margin:"0 0 3px"}}>✓ {sf==="recebido"?"Recebido":"Pago"}</p>
                         <p style={{fontSize:"16px",fontWeight:700,color:T.green,margin:0}}>{fmt(valorPago)}</p>
                         <p style={{fontSize:"11px",color:T.textSub,margin:"2px 0 0"}}>{totalPago} de {sorted.length} {group.isParcelado?"parcelas":"meses"}</p>
                       </div>
-                      <div style={{background:totalPendente>0?T.amberLight:T.greenLight,borderRadius:"8px",padding:"10px",border:`1px solid ${totalPendente>0?"#FDE68A":"#BBF7D0"}`}}>
+                      <div style={{background:totalPendente>0?T.amberLight:T.greenLight,borderRadius:"8px",padding:"10px",border:`1px solid ${totalPendente>0?T.amber+"55":T.green+"55"}`}}>
                         <p style={{fontSize:"10px",color:totalPendente>0?T.amber:T.green,fontWeight:600,textTransform:"uppercase",margin:"0 0 3px"}}>{totalPendente>0?"⏳ Pendente":"✓ Quitado"}</p>
                         <p style={{fontSize:"16px",fontWeight:700,color:totalPendente>0?T.amber:T.green,margin:0}}>{totalPendente>0?fmt(valorPendente):"R$ 0,00"}</p>
                         <p style={{fontSize:"11px",color:T.textSub,margin:"2px 0 0"}}>{totalPendente} restante(s)</p>
@@ -2970,7 +3150,7 @@ Cancelar = Dar baixa só nesta parcela`);
               <button style={btnO(T.purple)} onClick={async()=>{if(!syncUrl){setSyncStatus({ok:false,msg:"Cole a URL primeiro"});return;}setSyncing(true);try{const r=await fetch(`${syncUrl}?action=test`);const j=await r.json();setSyncStatus({ok:true,msg:j.message||"✅ Conexão OK!"});}catch{setSyncStatus({ok:false,msg:"❌ Erro de conexão"});}setSyncing(false);}}>
                 {syncing?"⏳ Testando...":"📡 Testar conexão"}
               </button>
-              {syncStatus&&<div style={{background:syncStatus.ok?T.greenLight:T.redLight,border:`1px solid ${syncStatus.ok?"#BBF7D0":"#FECACA"}`,borderRadius:"8px",padding:"10px 14px",marginTop:"10px",color:syncStatus.ok?T.green:T.red,fontSize:"13px"}}>{syncStatus.msg}</div>}
+              {syncStatus&&<div style={{background:syncStatus.ok?T.greenLight:T.redLight,border:`1px solid ${syncStatus.ok?T.green+"55":T.red+"55"}`,borderRadius:"8px",padding:"10px 14px",marginTop:"10px",color:syncStatus.ok?T.green:T.red,fontSize:"13px"}}>{syncStatus.msg}</div>}
             </div>
             <div style={card()}>
               <div style={{display:"flex",alignItems:"center",gap:"10px",marginBottom:"12px"}}>
@@ -3027,6 +3207,9 @@ Cancelar = Dar baixa só nesta parcela`);
 
       {/* MODAL LANÇAMENTO */}
       {showModal&&<LancModal tipo={showModal} form={showModal==="receita"?recForm:showModal==="despesa"?despForm:showModal==="investimento"?invForm:empForm} setForm={showModal==="receita"?setRecForm:showModal==="despesa"?setDespForm:showModal==="investimento"?setInvForm:setEmpForm} onSave={()=>addItem(showModal)} onClose={()=>setShowModal(null)} cadastros={cadastros} today={today}/>}
+
+      {/* MODAL PERFIL & CONFIGURAÇÕES */}
+      {showProfile&&<ProfileModal dark={dark} onToggleTheme={toggleTheme} onClose={()=>setShowProfile(false)} onLogout={handleLogout} onExport={exportData} user={authUser} isMobile={isMobile}/>}
 
       {/* MODAL EDIÇÃO */}
       {editingItem&&(
