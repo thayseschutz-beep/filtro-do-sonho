@@ -92,10 +92,7 @@ export default function LandingPage() {
       <nav>
         <div className="wrap nav-in">
           <div className="brand">
-            <svg className="brand-mark" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <rect width="100" height="100" rx="24" fill="#0F2419" />
-              <path d="M50 28c-13 0-22 9-22 22 0 9 5 16 13 19-1-9 3-16 11-20-6 6-8 13-6 21 9-1 18-9 18-22 0-12-7-20-14-20Z" fill="#22C55E" />
-            </svg>
+            <img className="brand-mark" src="/logo-mark.png" alt="GreenMind" />
             <div className="gm-wordmark"><span className="g">Green</span><span className="m">Mind</span></div>
           </div>
           <div className="nav-links">
@@ -331,7 +328,7 @@ export default function LandingPage() {
         <div className="wrap">
           <div className="foot-in">
             <div className="foot-brand">
-              <div className="gm-wordmark on-dark"><span className="g">Green</span><span className="m">Mind</span></div>
+              <div className="foot-lockup"><img className="brand-mark" src="/logo-mark.png" alt="GreenMind" /><div className="gm-wordmark on-dark"><span className="g">Green</span><span className="m">Mind</span></div></div>
               <p>O app de controle financeiro pessoal que faz seu dinheiro crescer com clareza.</p>
             </div>
             <div className="foot-cols">

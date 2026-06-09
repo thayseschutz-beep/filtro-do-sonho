@@ -838,7 +838,7 @@ Cancelar = Dar baixa só nesta parcela`);
       {/* SIDEBAR */}
       <div style={{width:sw,background:T.surface,borderRight:`1px solid ${T.border}`,display:isMobile?"none":"flex",flexDirection:"column",position:"fixed",top:0,left:0,bottom:0,zIndex:100,transition:"width 0.25s",overflow:"hidden",boxShadow:"1px 0 0 #E2E8F0"}}>
         <div style={{padding:"18px 14px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:"10px",whiteSpace:"nowrap"}}>
-          <div style={{width:"34px",height:"34px",borderRadius:"10px",flexShrink:0,background:"linear-gradient(135deg,#166534,#22C55E)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"17px"}}>🌱</div>
+          <img src="/logo-mark.png" alt="GreenMind" style={{width:"34px",height:"34px",flexShrink:0,objectFit:"contain"}} />
           {sidebarOpen&&<div><div style={{fontSize:"16px",fontWeight:700,color:T.text}}>Green<span style={{color:"#22C55E"}}>Mind</span></div><div style={{fontSize:"10px",color:T.textSub,letterSpacing:"1px"}}>FINANCIAL PLANNING</div></div>}
         </div>
         <nav style={{flex:1,padding:"10px 8px",display:"flex",flexDirection:"column",gap:"2px",overflowY:"auto"}}>
