@@ -751,7 +751,33 @@ export default function App(){
   const [showProfile, setShowProfile] = useState(false);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [authUser, setAuthUser] = useState(null);
-  useEffect(()=>{ (async()=>{ try{ const supabase=createClient(); const {data}=await supabase.auth.getUser(); if(data?.user){ const u=data.user; setAuthUser({ email:u.email, name:(u.user_metadata&&(u.user_metadata.name||u.user_metadata.full_name))||(u.email?u.email.split("@")[0]:"Você") }); } }catch(e){} })(); },[]);
+  const [accountId, setAccountId] = useState(null);
+  const [accountReady, setAccountReady] = useState(false);
+  useEffect(()=>{ let cancel=false; (async()=>{
+    try{
+      const supabase=createClient();
+      const {data}=await supabase.auth.getUser();
+      const u=data?.user;
+      if(!u){ if(!cancel){ setAccountReady(true); } return; }
+      setAuthUser({ email:u.email, name:(u.user_metadata&&(u.user_metadata.name||u.user_metadata.full_name))||(u.email?u.email.split("@")[0]:"Você") });
+      // Resolve a conta (household) deste usuário — isola cada pessoa, mantém o casal junto
+      let acc=null;
+      try{
+        const {data:map}=await supabase.from("user_accounts").select("account_id").eq("user_id",u.id).maybeSingle();
+        acc=map?.account_id||null;
+        if(!acc){
+          // primeiro acesso → cria conta individual e isolada (id = próprio usuário)
+          acc=u.id;
+          await supabase.from("user_accounts").insert({user_id:u.id, account_id:acc, role:"admin"});
+        }
+      }catch(e){
+        // tabela ainda não existe → isola por usuário mesmo assim (nunca cai no "casal" global)
+        console.error("user_accounts indisponível, isolando por user.id",e);
+        acc=u.id;
+      }
+      if(!cancel){ setAccountId(acc); setAccountReady(true); }
+    }catch(e){ console.error("Falha ao resolver conta",e); if(!cancel) setAccountReady(true); }
+  })(); return ()=>{cancel=true;}; },[]);
   const handleLogout = async()=>{ try{ const supabase=createClient(); await supabase.auth.signOut(); }catch(e){} window.location.href="/login"; };
   const exportData = ()=>{ const b=new Blob([JSON.stringify({allYearsData,cartoes,usoCartoes,pagamentos,cadastros,mei_data:meiData},null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=`greenmind_dados.json`;a.click();showToast("Exportado!"); };
   const [showModal, setShowModal] = useState(null); // tipo do modal
@@ -797,10 +823,11 @@ export default function App(){
 
   // supabase
   useEffect(()=>{
+    if(!accountId) return;
     const supabase = createClient();
     const load = async() => {
       try {
-        const {data:row} = await supabase.from("financas_compartilhadas").select("*").eq("id",CASAL_ID).single();
+        const {data:row} = await supabase.from("financas_compartilhadas").select("*").eq("id",accountId).single();
         if(row){
           // Migração: array antigo → multi-ano
           let loadedAllYears = {};
@@ -830,8 +857,8 @@ export default function App(){
       } catch(e){console.error("Load error",e);}
     };
     load();
-    const ch = supabase.channel("fin_rt")
-      .on("postgres_changes",{event:"UPDATE",schema:"public",table:"financas_compartilhadas",filter:`id=eq.${CASAL_ID}`},(payload)=>{
+    const ch = supabase.channel("fin_rt_"+accountId)
+      .on("postgres_changes",{event:"UPDATE",schema:"public",table:"financas_compartilhadas",filter:`id=eq.${accountId}`},(payload)=>{
         const row = payload.new;
         let rtAllYears = {};
         if(Array.isArray(row.data)&&row.data.length>0){
@@ -856,12 +883,13 @@ export default function App(){
         showToast("🔄 Atualizado!");
       }).subscribe();
     return()=>supabase.removeChannel(ch);
-  },[]);
+  },[accountId]);
 
   const saveToSupa = async(payload) => {
+    if(!accountId) return;
     const supabase = createClient();
     const {error} = await supabase.from("financas_compartilhadas").upsert({
-      id:CASAL_ID, updated_at:new Date().toISOString(),
+      id:accountId, updated_at:new Date().toISOString(),
       data:payload.allYearsData||payload.data||{},
       cartoes:Array.isArray(payload.cartoes)?payload.cartoes:[],
       uso_cartoes:Array.isArray(payload.uso_cartoes)?payload.uso_cartoes:[],
