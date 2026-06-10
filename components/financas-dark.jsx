@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 
@@ -494,6 +494,226 @@ function ProfileModal({dark,onToggleTheme,onClose,onLogout,onExport,user,isMobil
   );
 }
 
+// ── INTERPRETADOR DE LINGUAGEM NATURAL (lançar por texto) ───────────────────
+const NLP_CATS = [
+  ["Combustível", ["posto","gasolina","etanol","alcool","álcool","diesel","combustivel","combustível","ipiranga","shell","petrobras","abasteci","abastecer"]],
+  ["Transporte", ["uber","99","taxi","táxi","corrida","onibus","ônibus","metro","metrô","passagem","estacionamento","pedagio","pedágio","blablacar"]],
+  ["Alimentação", ["mercado","supermercado","feira","padaria","açougue","acougue","hortifruti","ifood","rappi","restaurante","lanche","lanchonete","almoço","almoco","jantar","café","cafe","cafézinho","pizza","hamburguer","hamburger","comida","sorvete","doce","mc donalds","mcdonalds","bk"]],
+  ["Saúde", ["farmacia","farmácia","remédio","remedio","médico","medico","consulta","exame","dentista","hospital","drogaria","drogasil","raia","plano de saúde","plano de saude","psicólogo","psicologo","terapia"]],
+  ["Academia", ["academia","gym","crossfit","personal","musculação","musculacao","smartfit","smart fit"]],
+  ["Esporte", ["esporte","futebol","quadra","tênis","tenis","natação","natacao","bike","ciclismo","corrida de rua","suplemento","whey"]],
+  ["Lazer", ["cinema","netflix","spotify","show","balada","viagem","hotel","passeio","jogo","game","steam","streaming","disney","hbo","prime video","bar ","cerveja","bebida"]],
+  ["Casa", ["aluguel","luz","energia","água","agua","condominio","condomínio","internet","wifi","gás","gas","iptu","faxina","limpeza","diarista","móvel","movel","eletrodoméstico"]],
+  ["Educação", ["curso","faculdade","escola","livro","mensalidade","udemy","alura","apostila","material escolar"]],
+  ["Vestuário", ["roupa","calçado","calcado","sapato","loja","shopping","zara","renner","cea","c&a","riachuelo","tênis novo"]],
+  ["Pets", ["pet","ração","racao","veterinário","veterinario","petshop","pet shop","cachorro","gato"]],
+  ["Assinaturas", ["assinatura","mensalidade app","icloud","google one","chatgpt","plano"]],
+];
+const NLP_REC_CATS = [
+  ["Salário", ["salário","salario","holerite","contracheque"]],
+  ["Freelance", ["freela","freelance","projeto","cliente","serviço","servico","bico"]],
+  ["Vendas", ["vendi","venda","vendas"]],
+  ["Rendimentos", ["rendimento","dividendo","juros","aluguel recebido"]],
+];
+function nlpNormalizaValor(raw){
+  if(!raw) return null;
+  let s=raw.trim().toLowerCase().replace(/r\$\s*/g,"");
+  // "3 mil", "1,5 mil", "2k"
+  const milMatch=s.match(/^(\d+(?:[.,]\d+)?)\s*(mil|k)$/);
+  if(milMatch){ return parseFloat(milMatch[1].replace(",","."))*1000; }
+  s=s.replace(/\s/g,"");
+  if(s.includes(".")&&s.includes(",")){ s=s.replace(/\./g,"").replace(",","."); } // 1.200,50
+  else if(s.includes(",")){ s=s.replace(",","."); } // 50,90
+  else if(/^\d{1,3}(\.\d{3})+$/.test(s)){ s=s.replace(/\./g,""); } // 1.200 (milhar)
+  const v=parseFloat(s);
+  return isNaN(v)?null:v;
+}
+function nlpExtraiValor(text){
+  const t=text.toLowerCase();
+  // valor com "mil"/"k"
+  const mil=t.match(/(\d+(?:[.,]\d+)?)\s*(mil|k)\b/);
+  if(mil) return {valor:nlpNormalizaValor(mil[0]),raw:mil[0]};
+  // R$ x  /  x reais  /  número solto
+  const m=t.match(/(?:r\$\s*)?(\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d+(?:,\d{1,2})|\d+(?:\.\d{1,2})?|\d+)\s*(?:reais|real|conto[s]?|pila|pau|mangos?)?/);
+  if(m){ return {valor:nlpNormalizaValor(m[1]),raw:m[1]}; }
+  return {valor:null,raw:null};
+}
+function nlpExtraiData(text,today){
+  const t=text.toLowerCase();
+  const base=new Date(today+"T12:00:00");
+  const iso=d=>d.toISOString().split("T")[0];
+  if(/anteontem/.test(t)){ base.setDate(base.getDate()-2); return iso(base); }
+  if(/\bontem\b/.test(t)){ base.setDate(base.getDate()-1); return iso(base); }
+  if(/amanh[ãa]/.test(t)){ base.setDate(base.getDate()+1); return iso(base); }
+  if(/\bhoje\b/.test(t)) return iso(base);
+  // dd/mm ou dd/mm/aaaa
+  const dm=t.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
+  if(dm){ let y=dm[3]?(dm[3].length===2?2000+ +dm[3]:+dm[3]):base.getFullYear(); const d=new Date(y,(+dm[2])-1,+dm[1],12); if(!isNaN(d)) return iso(d); }
+  // "dia 5"
+  const dia=t.match(/\bdia\s+(\d{1,2})\b/);
+  if(dia){ const d=new Date(base.getFullYear(),base.getMonth(),+dia[1],12); if(!isNaN(d)) return iso(d); }
+  return today;
+}
+function nlpExtraiMeio(text){
+  const t=text.toLowerCase();
+  if(/\b(cart[ãa]o|cr[ée]dito|d[ée]bito|visa|master|elo)\b/.test(t)) return "cartao";
+  if(/\b(dinheiro|esp[ée]cie|cash)\b/.test(t)) return "dinheiro";
+  if(/\bboleto\b/.test(t)) return "boleto";
+  if(/\bcheque\b/.test(t)) return "cheque";
+  return "pix";
+}
+function nlpCategoria(text,tipo){
+  const t=text.toLowerCase();
+  const list=tipo==="receita"?NLP_REC_CATS:NLP_CATS;
+  for(const [cat,kws] of list){ for(const k of kws){ if(t.includes(k)) return cat; } }
+  return tipo==="receita"?"Outros":"Outros";
+}
+function nlpTipo(text){
+  const t=text.toLowerCase();
+  if(/\b(recebi|ganhei|caiu|entrou|recebimento|sal[áa]rio|vendi|venda|freela|dividendo|rendimento)\b/.test(t)) return "receita";
+  if(/\b(investi|apliquei|investimento|a[çc][õo]es|tesouro|cdb|fii|bitcoin|cripto|poupei|poupan[çc]a)\b/.test(t)) return "investimento";
+  return "despesa";
+}
+function nlpDescricao(text,categoria,valorRaw){
+  let s=" "+text.normalize("NFC")+" ";
+  // remove verbos/comandos comuns
+  s=s.replace(/\b(gastei|paguei|comprei|recebi|ganhei|investi|apliquei|adicionar|adiciona|lan[çc]ar|registra[r]?|coloca[r]?|foi|de|do|da|no|na|em|com|por|um[a]?|os|as)\b/gi," ");
+  // remove valor e moeda
+  if(valorRaw) s=s.split(valorRaw).join(" ");
+  s=s.replace(/r\$\s*/gi," ").replace(/\b(reais|real|conto[s]?|pila|mil|k)\b/gi," ");
+  // remove datas
+  s=s.replace(/\b(hoje|ontem|anteontem|amanh[ãa]|dia\s+\d{1,2}|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\b/gi," ");
+  // remove meios de pagamento
+  s=s.replace(/(cart[ãa]o|cr[ée]dito|d[ée]bito|pix|dinheiro|esp[ée]cie|boleto|cheque|visa|master|elo)/gi," ");
+  // remove números soltos restantes
+  s=s.replace(/\d+([.,]\d+)?/g," ");
+  s=s.replace(/\s+/g," ").trim();
+  if(!s||s.length<2) return categoria;
+  return s.charAt(0).toUpperCase()+s.slice(1);
+}
+function parseTransacao(text,today){
+  if(!text||!text.trim()) return null;
+  const tipo=nlpTipo(text);
+  const {valor,raw}=nlpExtraiValor(text);
+  // texto sem o valor e sem dígitos → evita falso-positivo de categoria (ex.: "99")
+  let forCat=text.toLowerCase();
+  if(raw) forCat=forCat.split(String(raw).toLowerCase()).join(" ");
+  forCat=forCat.replace(/\d+([.,]\d+)?/g," ");
+  const categoria=nlpCategoria(forCat,tipo);
+  const date=nlpExtraiData(text,today);
+  const meioPag=nlpExtraiMeio(text);
+  const desc=nlpDescricao(text,categoria,raw);
+  return {tipo,valor,categoria,date,meioPag,desc};
+}
+
+function QuickAddModal({onClose,onConfirm,today,dark}){
+  const [text,setText]=useState("");
+  const [parsed,setParsed]=useState({tipo:"despesa",valor:"",categoria:"Outros",date:today,meioPag:"pix",desc:""});
+  const [touched,setTouched]=useState(false);
+  const recRef=useRef(null);
+  const [listening,setListening]=useState(false);
+  const [micSupported,setMicSupported]=useState(false);
+  useEffect(()=>{ if(typeof window!=="undefined"&&(window.SpeechRecognition||window.webkitSpeechRecognition)) setMicSupported(true); return ()=>{ try{ recRef.current&&recRef.current.stop(); }catch(e){} }; },[]);
+  const examples=["Mercado 85,90 hoje no cartão","Gasolina 200 ontem","Recebi 3 mil de salário","Farmácia 47 reais pix","Uber 23,90","Academia 99 dia 5"];
+  const runParse=(v)=>{ const p=parseTransacao(v,today); if(p) setParsed(pp=>({tipo:p.tipo,valor:p.valor!=null?String(p.valor):"",categoria:p.categoria,date:p.date,meioPag:p.meioPag,desc:p.desc})); };
+  const onText=(v)=>{ setText(v); setTouched(true); runParse(v); };
+  const toggleMic=()=>{
+    const SR=typeof window!=="undefined"&&(window.SpeechRecognition||window.webkitSpeechRecognition);
+    if(!SR) return;
+    if(listening){ try{ recRef.current&&recRef.current.stop(); }catch(e){} setListening(false); return; }
+    const r=new SR(); recRef.current=r; r.lang="pt-BR"; r.interimResults=true; r.continuous=false; r.maxAlternatives=1;
+    let finalText="";
+    r.onresult=(e)=>{ let interim=""; for(let i=e.resultIndex;i<e.results.length;i++){ const tr=e.results[i][0].transcript; if(e.results[i].isFinal) finalText+=tr; else interim+=tr; } const full=(finalText+interim).trim(); if(full) onText(full); };
+    r.onerror=()=>setListening(false);
+    r.onend=()=>setListening(false);
+    try{ r.start(); setListening(true); }catch(e){ setListening(false); }
+  };
+  const tipoColor={despesa:T.red,receita:T.green,investimento:T.blue}[parsed.tipo];
+  const tipoBg={despesa:T.redLight,receita:T.greenLight,investimento:T.blueLight}[parsed.tipo];
+  const tipoLabel={despesa:"Despesa",receita:"Receita",investimento:"Investimento"}[parsed.tipo];
+  const valido=parsed.valor&&parseFloat(parsed.valor)>0&&parsed.desc;
+  const MESC=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+  const dlabel=(()=>{const d=new Date(parsed.date+"T12:00:00");return `${d.getDate()} ${MESC[d.getMonth()]}`;})();
+  const inp={background:T.surfaceAlt,border:`1.5px solid ${T.borderStrong}`,borderRadius:"9px",padding:"9px 11px",color:T.text,fontSize:"13.5px",outline:"none"};
+  return (
+    <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:700,background:"rgba(0,0,0,.5)",backdropFilter:"blur(5px)",display:"flex",alignItems:"center",justifyContent:"center",padding:"18px"}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:T.surface,borderRadius:"22px",width:"520px",maxWidth:"96vw",maxHeight:"92vh",overflow:"auto",boxShadow:"0 40px 90px -30px rgba(0,0,0,.6)",border:`1px solid ${T.border}`}}>
+        <style>{`@keyframes gmPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}@keyframes gmWave{0%,100%{height:30%}50%{height:100%}}`}</style>
+        {/* header */}
+        <div style={{padding:"20px 22px 0"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"4px"}}>
+            <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
+              <span style={{width:"34px",height:"34px",borderRadius:"10px",display:"grid",placeItems:"center",background:"linear-gradient(140deg,#22C55E,#166534)",color:"#fff"}}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 3v4M3 5h4M6 17v4M4 19h4M13 3l2.5 6.5L22 12l-6.5 2.5L13 21l-2.5-6.5L4 12l6.5-2.5L13 3Z"/></svg>
+              </span>
+              <div>
+                <h2 style={{fontSize:"17px",fontWeight:700,color:T.text,margin:0}}>Lançar por texto</h2>
+                <p style={{fontSize:"12px",color:T.textSub,margin:"1px 0 0"}}>Escreva naturalmente — eu organizo pra você</p>
+              </div>
+            </div>
+            <button onClick={onClose} style={{width:"34px",height:"34px",borderRadius:"10px",border:`1px solid ${T.border}`,background:T.surface,color:T.textSub,cursor:"pointer",display:"grid",placeItems:"center"}}><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+          </div>
+        </div>
+        {/* input */}
+        <div style={{padding:"14px 22px 0"}}>
+          <div style={{position:"relative"}}>
+            <textarea autoFocus value={text} onChange={e=>onText(e.target.value)} placeholder={listening?"Ouvindo… pode falar":"Ex.: Mercado 85,90 hoje no cartão"} rows={2} style={{...inp,width:"100%",resize:"none",fontSize:"15px",lineHeight:1.4,boxSizing:"border-box",paddingRight:micSupported?"52px":"11px"}}/>
+            {micSupported&&<button onClick={toggleMic} title={listening?"Parar":"Falar"} style={{position:"absolute",right:"10px",bottom:"10px",width:"38px",height:"38px",borderRadius:"50%",border:"none",cursor:"pointer",display:"grid",placeItems:"center",background:listening?T.red:"linear-gradient(140deg,#22C55E,#166534)",color:"#fff",boxShadow:listening?`0 0 0 6px ${T.red}22`:"0 4px 12px -4px rgba(34,197,94,.7)",transition:".15s",animation:listening?"gmPulse 1.2s ease-in-out infinite":"none"}}>
+              {listening
+                ? <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+                : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4"/></svg>}
+            </button>}
+          </div>
+          {listening&&<div style={{display:"flex",alignItems:"center",gap:"8px",marginTop:"10px",color:T.red,fontSize:"12.5px",fontWeight:600}}><span style={{display:"flex",gap:"3px",alignItems:"flex-end",height:"14px"}}>{[0,1,2,3].map(i=><span key={i} style={{width:"3px",borderRadius:"2px",background:T.red,height:"100%",animation:`gmWave 0.9s ease-in-out ${i*0.12}s infinite`}}/>)}</span>Ouvindo… fale o lançamento</div>}
+          {!touched&&!listening&&<div style={{display:"flex",flexWrap:"wrap",gap:"6px",marginTop:"10px"}}>
+            {micSupported&&<button onClick={toggleMic} style={{display:"inline-flex",alignItems:"center",gap:"6px",fontSize:"12px",fontWeight:600,color:T.green,background:T.greenLight,border:`1px solid ${T.green}40`,borderRadius:"999px",padding:"5px 12px",cursor:"pointer"}}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4"/></svg>Falar</button>}
+            {examples.map(ex=>(<button key={ex} onClick={()=>onText(ex)} style={{fontSize:"12px",color:T.textSub,background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:"999px",padding:"5px 11px",cursor:"pointer"}}>{ex}</button>))}
+          </div>}
+        </div>
+        {/* preview */}
+        {touched&&<div style={{padding:"16px 22px 0"}}>
+          <p style={{fontSize:"11px",fontWeight:700,letterSpacing:".08em",textTransform:"uppercase",color:T.textMuted,margin:"0 0 10px"}}>Confira e ajuste</p>
+          <div style={{background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:"14px",padding:"14px"}}>
+            <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"12px"}}>
+              {["despesa","receita","investimento"].map(tp=>{const on=parsed.tipo===tp;const c={despesa:T.red,receita:T.green,investimento:T.blue}[tp];return (
+                <button key={tp} onClick={()=>setParsed(p=>({...p,tipo:tp}))} style={{flex:1,fontSize:"12.5px",fontWeight:600,padding:"7px 6px",borderRadius:"9px",cursor:"pointer",border:`1.5px solid ${on?c:T.border}`,background:on?({despesa:T.redLight,receita:T.greenLight,investimento:T.blueLight}[tp]):"transparent",color:on?c:T.textSub}}>{ {despesa:"Despesa",receita:"Receita",investimento:"Investir"}[tp] }</button>
+              );})}
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:"10px",marginBottom:"10px"}}>
+              <span style={{fontSize:"20px",fontWeight:700,color:tipoColor}}>R$</span>
+              <input value={parsed.valor} onChange={e=>setParsed(p=>({...p,valor:e.target.value.replace(/[^\d.,]/g,"")}))} placeholder="0,00" style={{...inp,flex:1,fontSize:"22px",fontWeight:700,color:tipoColor,fontFamily:"'Sora',sans-serif"}}/>
+            </div>
+            <input value={parsed.desc} onChange={e=>setParsed(p=>({...p,desc:e.target.value}))} placeholder="Descrição" style={{...inp,width:"100%",marginBottom:"10px",boxSizing:"border-box"}}/>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px"}}>
+              <div>
+                <label style={{fontSize:"11px",color:T.textMuted,display:"block",marginBottom:"3px"}}>Categoria</label>
+                <input value={parsed.categoria} onChange={e=>setParsed(p=>({...p,categoria:e.target.value}))} style={{...inp,width:"100%",boxSizing:"border-box"}}/>
+              </div>
+              <div>
+                <label style={{fontSize:"11px",color:T.textMuted,display:"block",marginBottom:"3px"}}>Data</label>
+                <input type="date" value={parsed.date} onChange={e=>setParsed(p=>({...p,date:e.target.value}))} style={{...inp,width:"100%",boxSizing:"border-box"}}/>
+              </div>
+            </div>
+            {parsed.tipo!=="investimento"&&<div style={{marginTop:"8px"}}>
+              <label style={{fontSize:"11px",color:T.textMuted,display:"block",marginBottom:"4px"}}>Meio</label>
+              <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
+                {[["pix","PIX"],["cartao","Cartão"],["dinheiro","Dinheiro"],["boleto","Boleto"]].map(([v,l])=>{const on=parsed.meioPag===v;return (
+                  <button key={v} onClick={()=>setParsed(p=>({...p,meioPag:v}))} style={{fontSize:"12px",fontWeight:600,padding:"6px 12px",borderRadius:"8px",cursor:"pointer",border:`1px solid ${on?T.green:T.border}`,background:on?T.greenLight:"transparent",color:on?T.green:T.textSub}}>{l}</button>
+                );})}
+              </div>
+            </div>}
+          </div>
+        </div>}
+        {/* footer */}
+        <div style={{display:"flex",gap:"10px",padding:"18px 22px 22px",justifyContent:"flex-end"}}>
+          <button onClick={onClose} style={{padding:"11px 18px",borderRadius:"11px",border:`1.5px solid ${T.borderStrong}`,background:"transparent",color:T.text,fontWeight:600,fontSize:"13.5px",cursor:"pointer"}}>Cancelar</button>
+          <button disabled={!valido} onClick={()=>onConfirm(parsed)} style={{padding:"11px 22px",borderRadius:"11px",border:"none",cursor:valido?"pointer":"not-allowed",opacity:valido?1:.5,background:"linear-gradient(140deg,#22C55E,#166534)",color:"#fff",fontWeight:600,fontSize:"14px",boxShadow:"0 8px 18px -8px rgba(34,197,94,.7)"}}>Adicionar {parsed.valor?`· R$ ${parsed.valor}`:""}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main App ───────────────────────────────────────────────────────────────
 export default function App(){
   const today = new Date().toISOString().split("T")[0];
@@ -529,6 +749,7 @@ export default function App(){
   const toggleTheme = () => setDark(d=>{ const n=!d; try{ localStorage.setItem('gm_theme', n?'dark':'light'); }catch(e){} return n; });
   applyTheme(dark);
   const [showProfile, setShowProfile] = useState(false);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [authUser, setAuthUser] = useState(null);
   useEffect(()=>{ (async()=>{ try{ const supabase=createClient(); const {data}=await supabase.auth.getUser(); if(data?.user){ const u=data.user; setAuthUser({ email:u.email, name:(u.user_metadata&&(u.user_metadata.name||u.user_metadata.full_name))||(u.email?u.email.split("@")[0]:"Você") }); } }catch(e){} })(); },[]);
   const handleLogout = async()=>{ try{ const supabase=createClient(); await supabase.auth.signOut(); }catch(e){} window.location.href="/login"; };
@@ -885,6 +1106,30 @@ export default function App(){
     setData(d=>d.map((m,i)=>i===currentMonth?{...m,[key]:[...m[key],item]}:m));
     setShowModal(null);
     showToast("Item adicionado!");
+  };
+
+  // ── Lançar por texto (IA) → insere no mês/ano da data ──────────────────────
+  const addParsedItem = (p) => {
+    const valor=parseFloat(String(p.valor).replace(",","."))||0;
+    if(!p.desc||!valor){ showToast("Confira descrição e valor","error"); return; }
+    const d=new Date((p.date||today)+"T12:00:00");
+    const ty=d.getFullYear(), tm=d.getMonth();
+    const key=p.tipo==="receita"?"receitas":p.tipo==="investimento"?"investimentos":"despesas";
+    let item;
+    if(key==="receitas") item={id:uid(),desc:p.desc,valor,date:p.date,ref:"",cliente:"",categoria:p.categoria,formaRec:p.meioPag||"pix",banco:""};
+    else if(key==="investimentos") item={id:uid(),desc:p.desc,valor,date:p.date,ref:"",categoria:p.categoria,investido:true,banco:""};
+    else item={id:uid(),desc:p.desc,valor,date:p.date,ref:"",fornecedor:"",categoria:p.categoria,recorrente:false,formaPag:"avista",parcelas:1,meioPag:p.meioPag||"pix",pago:false};
+    setAllYearsData(all=>{
+      const yrKey=String(ty);
+      const base=(Array.isArray(all[yrKey])&&all[yrKey].length===12)
+        ? all[yrKey].map(m=>({...m,[key]:[...m[key]]}))
+        : emptyYear();
+      base[tm][key].push(item);
+      return {...all,[yrKey]:base};
+    });
+    setShowQuickAdd(false);
+    const MESN=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+    showToast(`✅ ${p.tipo==="receita"?"Receita":p.tipo==="investimento"?"Investimento":"Despesa"} de ${fmt(valor)} em ${MESN[tm]}/${ty}`);
   };
 
   const removeItem=(tipo,id)=>{
@@ -1308,12 +1553,12 @@ Cancelar = Dar baixa só nesta parcela`);
 
             <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:"10px",marginBottom:"14px"}}>
               {[
-                {label:"Lançar",sec:"lancamentos",hot:true,ic:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>},
+                {label:"Lançar",sec:"lancamentos",hot:true,quick:true,ic:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>},
                 {label:"Cartões",sec:"cartoes",ic:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M2.5 9.5h19"/></svg>},
                 {label:"Relatório",sec:"relatorio",ic:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M7 15l4-4 3 2 5-6"/></svg>},
                 {label:"MEI",sec:"mei",ic:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2"/></svg>},
               ].map(q=>(
-                <button key={q.label} onClick={()=>setActiveSection(q.sec)} style={{
+                <button key={q.label} onClick={()=>q.quick?setShowQuickAdd(true):setActiveSection(q.sec)} style={{
                   display:"flex",flexDirection:"column",alignItems:"center",gap:"7px",padding:"14px 6px",borderRadius:"16px",cursor:"pointer",
                   border:q.hot?"0":`1px solid ${T.border}`,
                   background:q.hot?"linear-gradient(140deg,#4ADE80 0%,#22C55E 42%,#166534 100%)":T.surface,
@@ -3210,6 +3455,15 @@ Cancelar = Dar baixa só nesta parcela`);
 
       {/* MODAL PERFIL & CONFIGURAÇÕES */}
       {showProfile&&<ProfileModal dark={dark} onToggleTheme={toggleTheme} onClose={()=>setShowProfile(false)} onLogout={handleLogout} onExport={exportData} user={authUser} isMobile={isMobile}/>}
+
+      {/* MODAL LANÇAR POR TEXTO (IA) */}
+      {showQuickAdd&&<QuickAddModal today={today} dark={dark} onClose={()=>setShowQuickAdd(false)} onConfirm={addParsedItem}/>}
+
+      {/* BOTÃO FLUTUANTE — lançar por texto */}
+      <button onClick={()=>setShowQuickAdd(true)} title="Lançar por texto" style={{position:"fixed",right:isMobile?"18px":"26px",bottom:isMobile?"86px":"26px",zIndex:600,height:"56px",padding:"0 22px 0 18px",borderRadius:"999px",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:"10px",background:"linear-gradient(140deg,#4ADE80,#22C55E 45%,#166534)",color:"#fff",fontWeight:700,fontSize:"15px",boxShadow:"0 16px 34px -10px rgba(22,101,52,.7)"}}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 3v4M3 5h4M6 17v4M4 19h4M13 3l2.5 6.5L22 12l-6.5 2.5L13 21l-2.5-6.5L4 12l6.5-2.5L13 3Z"/></svg>
+        Lançar
+      </button>
 
       {/* MODAL EDIÇÃO */}
       {editingItem&&(
