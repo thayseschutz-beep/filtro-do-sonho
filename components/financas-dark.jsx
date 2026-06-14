@@ -353,58 +353,106 @@ const pmBtnGreen = ()=>({padding:"11px 20px",borderRadius:"11px",border:"none",c
 const pmBtnGhost = ()=>({padding:"10px 18px",borderRadius:"11px",border:`1.5px solid ${T.borderStrong}`,cursor:"pointer",background:"transparent",color:T.text,fontWeight:600,fontSize:"13px"});
 function PMAvatar({name,color,size=44}){const initials=(name||"?").split(" ").map(w=>w[0]).slice(0,2).join("").toUpperCase();return <div style={{width:size,height:size,borderRadius:"50%",background:color,color:"#fff",display:"grid",placeItems:"center",fontWeight:700,fontSize:size*0.36+"px",flexShrink:0,boxShadow:"0 2px 8px rgba(0,0,0,.18)"}}>{initials}</div>;}
 
-function PMPerfil({user}){
+function PMPerfil({user,onSaveProfile}){
   const nome=user?.name||"Você"; const email=user?.email||"—";
+  const [form,setForm]=useState({name:user?.name||"",email:user?.email||"",phone:"",pass:""});
+  const [saving,setSaving]=useState(false);
+  useEffect(()=>{ setForm(f=>({...f,name:user?.name||"",email:user?.email||""})); },[user]);
+  const dirty=(form.name!==(user?.name||""))||(form.email!==(user?.email||""))||!!form.pass;
+  const doSave=async()=>{
+    if(!dirty||!onSaveProfile) return;
+    setSaving(true);
+    const patch={};
+    if(form.name&&form.name!==user?.name) patch.name=form.name;
+    if(form.email&&form.email!==user?.email) patch.email=form.email;
+    if(form.pass) patch.password=form.pass;
+    const ok=await onSaveProfile(patch);
+    if(ok) setForm(f=>({...f,pass:""}));
+    setSaving(false);
+  };
   return <div>
     <div style={{display:"flex",alignItems:"center",gap:"16px",marginBottom:"22px"}}>
-      <div style={{position:"relative"}}><PMAvatar name={nome} color="#166534" size={72}/><button style={{position:"absolute",bottom:-2,right:-2,width:"26px",height:"26px",borderRadius:"50%",border:`2px solid ${T.surface}`,background:T.green,color:"#fff",cursor:"pointer",display:"grid",placeItems:"center"}}><PMI d="M12 5v14M5 12h14" s={13}/></button></div>
-      <div><p style={{fontSize:"18px",fontWeight:700,color:T.text,margin:0}}>{nome}</p><p style={{fontSize:"13px",color:T.textSub,margin:"3px 0 0"}}>{email}</p></div>
+      <div style={{position:"relative"}}><PMAvatar name={form.name||nome} color="#166534" size={72}/><button title="Trocar foto (em breve)" style={{position:"absolute",bottom:-2,right:-2,width:"26px",height:"26px",borderRadius:"50%",border:`2px solid ${T.surface}`,background:T.green,color:"#fff",cursor:"pointer",display:"grid",placeItems:"center"}}><PMI d="M12 5v14M5 12h14" s={13}/></button></div>
+      <div><p style={{fontSize:"18px",fontWeight:700,color:T.text,margin:0}}>{form.name||nome}</p><p style={{fontSize:"13px",color:T.textSub,margin:"3px 0 0"}}>{form.email||email}</p></div>
     </div>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
-      <PMField label="Nome"><input style={pmInp()} defaultValue={nome}/></PMField>
-      <PMField label="Telefone"><input style={pmInp()} placeholder="(00) 00000-0000"/></PMField>
+      <PMField label="Nome"><input style={pmInp()} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></PMField>
+      <PMField label="Telefone"><input style={pmInp()} value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} placeholder="(00) 00000-0000"/></PMField>
     </div>
-    <PMField label="E-mail" hint="Usado para login e para receber convites."><input style={pmInp()} defaultValue={email}/></PMField>
+    <PMField label="E-mail" hint="Usado para login e para receber convites. Trocar exige confirmação por e-mail."><input style={pmInp()} value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))}/></PMField>
     <div style={{height:"1px",background:T.border,margin:"8px 0 18px"}}/>
     <p style={{fontSize:"13px",fontWeight:700,color:T.text,margin:"0 0 12px"}}>Alterar senha</p>
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
-      <PMField label="Senha atual"><input type="password" style={pmInp()} placeholder="••••••••"/></PMField>
-      <PMField label="Nova senha"><input type="password" style={pmInp()} placeholder="Mínimo 8 caracteres"/></PMField>
-    </div>
-    <div style={{display:"flex",justifyContent:"flex-end",gap:"10px",marginTop:"8px"}}><button style={pmBtnGhost()}>Cancelar</button><button style={pmBtnGreen()}>Salvar alterações</button></div>
+    <PMField label="Nova senha" hint="Deixe em branco para manter a atual"><input type="password" style={pmInp()} value={form.pass} onChange={e=>setForm(f=>({...f,pass:e.target.value}))} placeholder="Mínimo 6 caracteres"/></PMField>
+    <div style={{display:"flex",justifyContent:"flex-end",gap:"10px",marginTop:"8px"}}><button onClick={()=>setForm({name:user?.name||"",email:user?.email||"",phone:"",pass:""})} style={pmBtnGhost()}>Cancelar</button><button onClick={doSave} disabled={!dirty||saving} style={{...pmBtnGreen(),opacity:(!dirty||saving)?.5:1,cursor:(!dirty||saving)?"not-allowed":"pointer"}}>{saving?"Salvando…":"Salvar alterações"}</button></div>
   </div>;
 }
-function PMCasal(){
+function PMCasal({user,members,accountId,onUpdateMember,onInvite}){
   const [share,setShare]=useState({lanc:true,cartoes:true,metas:true,mei:false});
-  const [perms,setPerms]=useState({lucas:"editar"});
+  const [permState,setPermState]=useState({});
+  const [editId,setEditId]=useState(null);
+  const [editForm,setEditForm]=useState({name:"",email:""});
+  const [inv,setInv]=useState({email:"",role:"editar"});
+  const [sending,setSending]=useState(false);
   const PERM={admin:{label:"Administrador",desc:"Acesso total: lança, edita, exclui, convida e gerencia o plano",c:T.green,bg:T.greenLight},editar:{label:"Pode editar",desc:"Lança, edita e exclui — mas não gerencia membros nem o plano",c:T.blue,bg:T.blueLight},ver:{label:"Somente ver",desc:"Visualiza tudo, mas não pode lançar nem alterar nada",c:T.amber,bg:T.amberLight}};
+  const COLORS=["#166534","#0EA5E9","#8B5CF6","#F59E0B","#EC4899"];
+  const list=Array.isArray(members)&&members.length?members:[{user_id:user?.id,email:user?.email,name:user?.name,role:"admin"}];
+  const me=list.find(m=>m.user_id===user?.id)||list[0];
+  const others=list.filter(m=>m!==me);
+  const nameOf=(m,i)=>m?.name||(m?.email?m.email.split("@")[0]:`Membro ${i+1}`);
+  const solo=others.length===0;
+  const startEdit=(m)=>{ setEditId(m.user_id); setEditForm({name:m.name||"",email:m.email||""}); };
+  const saveEdit=(m)=>{ onUpdateMember&&onUpdateMember(m.user_id,{name:editForm.name,email:editForm.email}); setEditId(null); };
+  const changePerm=(m,pk)=>{ setPermState(s=>({...s,[m.user_id]:pk})); onUpdateMember&&onUpdateMember(m.user_id,{role:pk}); };
+  const doInvite=async()=>{ if(!onInvite)return; setSending(true); const ok=await onInvite(inv.email,inv.role); if(ok) setInv({email:"",role:"editar"}); setSending(false); };
   return <div>
     <div style={{background:"linear-gradient(160deg,#166534,#0F2419)",borderRadius:"18px",padding:"20px",color:"#fff",marginBottom:"18px",position:"relative",overflow:"hidden"}}>
       <div style={{position:"absolute",inset:0,opacity:.5,background:"radial-gradient(130px 130px at 90% -10%, rgba(74,222,128,.5), transparent 70%)"}}/>
       <div style={{position:"relative",display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"16px"}}>
-        <div><p style={{fontSize:"15px",fontWeight:700,margin:0}}>Conta da família</p><p style={{fontSize:"12.5px",color:"rgba(255,255,255,.7)",margin:"3px 0 0"}}>2 pessoas · sincronizadas</p></div>
-        <span style={{display:"inline-flex",alignItems:"center",gap:"7px",background:"rgba(74,222,128,.22)",color:"#bbf7d0",fontSize:"11.5px",fontWeight:600,padding:"6px 12px",borderRadius:"999px"}}><span style={{width:"7px",height:"7px",borderRadius:"50%",background:"#4ADE80",boxShadow:"0 0 0 3px rgba(74,222,128,.3)"}}/>Tempo real</span>
+        <div><p style={{fontSize:"15px",fontWeight:700,margin:0}}>{solo?"Sua conta":"Conta compartilhada"}</p><p style={{fontSize:"12.5px",color:"rgba(255,255,255,.7)",margin:"3px 0 0"}}>{list.length} {list.length===1?"pessoa":"pessoas"}{solo?"":" · sincronizadas"}</p></div>
+        {!solo&&<span style={{display:"inline-flex",alignItems:"center",gap:"7px",background:"rgba(74,222,128,.22)",color:"#bbf7d0",fontSize:"11.5px",fontWeight:600,padding:"6px 12px",borderRadius:"999px"}}><span style={{width:"7px",height:"7px",borderRadius:"50%",background:"#4ADE80",boxShadow:"0 0 0 3px rgba(74,222,128,.3)"}}/>Tempo real</span>}
       </div>
-      <div style={{position:"relative",display:"flex",alignItems:"center"}}><PMAvatar name="Thayse" color="#22C55E" size={46}/><div style={{marginLeft:"-12px"}}><PMAvatar name="Lucas" color="#0EA5E9" size={46}/></div><p style={{marginLeft:"14px",fontSize:"12.5px",color:"rgba(255,255,255,.85)"}}>Última atualização agora há pouco</p></div>
+      <div style={{position:"relative",display:"flex",alignItems:"center"}}>
+        {list.map((m,i)=>(<div key={m.user_id||i} style={{marginLeft:i===0?0:"-12px"}}><PMAvatar name={nameOf(m,i)} color={COLORS[i%COLORS.length]} size={46}/></div>))}
+        <p style={{marginLeft:"14px",fontSize:"12.5px",color:"rgba(255,255,255,.85)"}}>{solo?"Compartilhar é opcional — convide se quiser":"Tudo em tempo real entre vocês"}</p>
+      </div>
     </div>
     <p style={{fontSize:"13px",fontWeight:700,color:T.text,margin:"0 0 8px"}}>Membros & permissões</p>
+    {/* você */}
     <div style={{display:"flex",alignItems:"center",gap:"12px",padding:"12px",background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:"12px",marginBottom:"8px"}}>
-      <PMAvatar name="Thayse" color="#166534" size={40}/><div style={{flex:1,minWidth:0}}><p style={{fontSize:"14px",fontWeight:600,color:T.text,margin:0}}>Thayse <span style={{fontSize:"11px",color:T.green,fontWeight:600}}>· você</span></p><p style={{fontSize:"12px",color:T.textSub,margin:"2px 0 0"}}>thayse@email.com</p></div>
+      <PMAvatar name={nameOf(me,0)} color="#166534" size={40}/><div style={{flex:1,minWidth:0}}><p style={{fontSize:"14px",fontWeight:600,color:T.text,margin:0}}>{nameOf(me,0)} <span style={{fontSize:"11px",color:T.green,fontWeight:600}}>· você</span></p><p style={{fontSize:"12px",color:T.textSub,margin:"2px 0 0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{me?.email||"—"}</p></div>
       <span style={{fontSize:"11.5px",fontWeight:600,color:T.green,background:T.greenLight,border:`1px solid ${T.green}40`,padding:"5px 10px",borderRadius:"8px",flexShrink:0}}>Administrador</span>
     </div>
-    <div style={{padding:"12px",background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:"12px",marginBottom:"8px"}}>
-      <div style={{display:"flex",alignItems:"center",gap:"12px"}}><PMAvatar name="Lucas Silva" color="#0EA5E9" size={40}/><div style={{flex:1,minWidth:0}}><p style={{fontSize:"14px",fontWeight:600,color:T.text,margin:0}}>Lucas Silva</p><p style={{fontSize:"12px",color:T.textSub,margin:"2px 0 0"}}>lucas@email.com</p></div></div>
-      <div style={{display:"flex",gap:"5px",marginTop:"12px",background:T.surface,border:`1px solid ${T.border}`,borderRadius:"11px",padding:"4px"}}>
-        {["admin","editar","ver"].map(p=>{const on=perms.lucas===p;const P=PERM[p];return <button key={p} onClick={()=>setPerms(s=>({...s,lucas:p}))} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:"7px",border:"none",cursor:"pointer",fontSize:"12.5px",fontWeight:600,padding:"9px 8px",borderRadius:"8px",background:on?P.bg:"transparent",color:on?P.c:T.textSub}}><span style={{width:"7px",height:"7px",borderRadius:"50%",background:on?P.c:T.borderStrong}}/>{P.label}</button>;})}
+    {/* co-membros reais — editáveis */}
+    {others.map((m,i)=>{const perm=permState[m.user_id]||(m.role&&PERM[m.role]?m.role:"editar");const editing=editId===m.user_id;return (
+    <div key={m.user_id||i} style={{padding:"12px",background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:"12px",marginBottom:"8px"}}>
+      <div style={{display:"flex",alignItems:"center",gap:"12px"}}>
+        <PMAvatar name={nameOf(m,i+1)} color={COLORS[(i+1)%COLORS.length]} size={40}/>
+        {editing?(
+          <div style={{flex:1,display:"flex",flexDirection:"column",gap:"6px"}}>
+            <input value={editForm.name} onChange={e=>setEditForm(f=>({...f,name:e.target.value}))} placeholder="Nome" style={{...pmInp(),padding:"7px 10px",fontSize:"13px"}}/>
+            <input value={editForm.email} onChange={e=>setEditForm(f=>({...f,email:e.target.value}))} placeholder="email@exemplo.com" style={{...pmInp(),padding:"7px 10px",fontSize:"13px"}}/>
+          </div>
+        ):(
+          <div style={{flex:1,minWidth:0}}><p style={{fontSize:"14px",fontWeight:600,color:T.text,margin:0}}>{nameOf(m,i+1)}</p><p style={{fontSize:"12px",color:T.textSub,margin:"2px 0 0",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.email||"—"}</p></div>
+        )}
+        {editing
+          ? <div style={{display:"flex",gap:"6px",flexShrink:0}}><button onClick={()=>saveEdit(m)} style={{...pmBtnGreen(),padding:"7px 12px",fontSize:"12px"}}>Salvar</button><button onClick={()=>setEditId(null)} style={{...pmBtnGhost(),padding:"7px 10px",fontSize:"12px"}}>✕</button></div>
+          : <button onClick={()=>startEdit(m)} title="Editar" style={{width:"32px",height:"32px",borderRadius:"9px",border:`1px solid ${T.border}`,background:T.surface,color:T.textSub,cursor:"pointer",display:"grid",placeItems:"center",flexShrink:0}}><PMI d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" s={15}/></button>}
       </div>
-      <p style={{fontSize:"12px",color:T.textSub,margin:"10px 2px 0",lineHeight:1.45}}>{PERM[perms.lucas].desc}</p>
-      {perms.lucas==="ver"&&<p style={{fontSize:"11.5px",color:T.amber,margin:"6px 2px 0",fontWeight:500}}>👀 O Lucas verá tudo em tempo real, mas os botões de lançar e editar ficam ocultos pra ele.</p>}
+      <div style={{display:"flex",gap:"5px",marginTop:"12px",background:T.surface,border:`1px solid ${T.border}`,borderRadius:"11px",padding:"4px"}}>
+        {["admin","editar","ver"].map(pk=>{const on=perm===pk;const P=PERM[pk];return <button key={pk} onClick={()=>changePerm(m,pk)} style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:"7px",border:"none",cursor:"pointer",fontSize:"12.5px",fontWeight:600,padding:"9px 8px",borderRadius:"8px",background:on?P.bg:"transparent",color:on?P.c:T.textSub}}><span style={{width:"7px",height:"7px",borderRadius:"50%",background:on?P.c:T.borderStrong}}/>{P.label}</button>;})}
+      </div>
+      <p style={{fontSize:"12px",color:T.textSub,margin:"10px 2px 0",lineHeight:1.45}}>{PERM[perm].desc}</p>
+      {perm==="ver"&&<p style={{fontSize:"11.5px",color:T.amber,margin:"6px 2px 0",fontWeight:500}}>👀 Verá tudo em tempo real, mas os botões de lançar e editar ficam ocultos.</p>}
     </div>
+    );})}
+    {/* convite — funcional */}
     <div style={{border:`1.5px dashed ${T.borderStrong}`,borderRadius:"12px",padding:"16px",marginTop:"6px"}}>
-      <p style={{fontSize:"13.5px",fontWeight:600,color:T.text,margin:"0 0 4px"}}>Convidar alguém</p>
-      <p style={{fontSize:"12.5px",color:T.textSub,margin:"0 0 12px",lineHeight:1.45}}>A pessoa recebe um e-mail para baixar o app. Você define a permissão dela ao convidar.</p>
-      <div style={{display:"flex",gap:"8px",marginBottom:"8px"}}><input style={{...pmInp(),flex:1}} placeholder="email@exemplo.com"/><select style={{...pmInp(),width:"auto"}} defaultValue="editar"><option value="admin">Administrador</option><option value="editar">Pode editar</option><option value="ver">Somente ver</option></select></div>
-      <button style={{...pmBtnGreen(),width:"100%"}}>Enviar convite</button>
+      <p style={{fontSize:"13.5px",fontWeight:600,color:T.text,margin:"0 0 4px"}}>{solo?"Compartilhar sua conta":"Convidar mais alguém"}</p>
+      <p style={{fontSize:"12.5px",color:T.textSub,margin:"0 0 12px",lineHeight:1.45}}>Digite o e-mail e a permissão. Quando a pessoa criar a conta com esse e-mail, ela entra automaticamente na sua conta.</p>
+      <div style={{display:"flex",gap:"8px",marginBottom:"8px"}}><input value={inv.email} onChange={e=>setInv(s=>({...s,email:e.target.value}))} style={{...pmInp(),flex:1}} placeholder="email@exemplo.com"/><select value={inv.role} onChange={e=>setInv(s=>({...s,role:e.target.value}))} style={{...pmInp(),width:"auto"}}><option value="admin">Administrador</option><option value="editar">Pode editar</option><option value="ver">Somente ver</option></select></div>
+      <button onClick={doInvite} disabled={sending} style={{...pmBtnGreen(),width:"100%",opacity:sending?.6:1,cursor:sending?"not-allowed":"pointer"}}>{sending?"Enviando…":"Criar convite"}</button>
+      <p style={{fontSize:"11px",color:T.textMuted,margin:"9px 2px 0",lineHeight:1.4}}>O e-mail automático de aviso entra em breve. Por ora, avise a pessoa para criar a conta com esse mesmo e-mail.</p>
     </div>
     <p style={{fontSize:"13px",fontWeight:700,color:T.text,margin:"20px 0 4px"}}>O que vocês compartilham</p>
     <PMRow label="Lançamentos & saldo" desc="Receitas, despesas e o saldo do mês" right={<PMToggle on={share.lanc} onClick={()=>setShare(s=>({...s,lanc:!s.lanc}))}/>}/>
@@ -435,7 +483,7 @@ function PMRegra(){
 }
 function PMNotif(){
   const [n,setN]=useState({fatura:true,lancar:true,meta:true,resumo:true,mei:true,casal:true});
-  const items=[["fatura","Vencimento de faturas","Avisa 3 dias antes de cada fatura"],["lancar","Lembrete de lançar","Toda noite, se você não registrou nada"],["meta","Meta atingida","Quando você bate um objetivo 🎉"],["resumo","Resumo mensal","No 1º dia do mês, um balanço do mês anterior"],["mei","Alerta de limite MEI","Quando a projeção passar de 80% do limite"],["casal","Atividade do casal","Quando o Lucas adiciona ou edita algo"]];
+  const items=[["fatura","Vencimento de faturas","Avisa 3 dias antes de cada fatura"],["lancar","Lembrete de lançar","Toda noite, se você não registrou nada"],["meta","Meta atingida","Quando você bate um objetivo 🎉"],["resumo","Resumo mensal","No 1º dia do mês, um balanço do mês anterior"],["mei","Alerta de limite MEI","Quando a projeção passar de 80% do limite"],["casal","Atividade compartilhada","Quando alguém da conta adiciona ou edita algo"]];
   return <div>{items.map(([k,l,d])=><PMRow key={k} label={l} desc={d} right={<PMToggle on={n[k]} onClick={()=>setN(s=>({...s,[k]:!s[k]}))}/>}/>)}</div>;
 }
 function PMSeg(){
@@ -445,16 +493,16 @@ function PMSeg(){
     <PMRow label="PIN de 4 dígitos" desc="Alternativa à biometria" right={<button style={pmBtnGhost()}>Configurar</button>}/>
     <PMRow label="Verificação em duas etapas" desc="Código extra por e-mail ao entrar em um aparelho novo" right={<PMToggle on={twofa} onClick={()=>setTwofa(!twofa)}/>}/>
     <p style={{fontSize:"13px",fontWeight:700,color:T.text,margin:"20px 0 8px"}}>Sessões ativas</p>
-    {[["iPhone 15 · Thayse","São Paulo · agora",true],["Chrome · Windows","São Paulo · há 2 dias",false]].map(([d,s,cur])=>(<div key={d} style={{display:"flex",alignItems:"center",gap:"12px",padding:"11px 0",borderBottom:`1px solid ${T.border}`}}><span style={{color:T.textSub}}><PMI d="M5 3h14a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1ZM12 18h.01"/></span><div style={{flex:1}}><p style={{fontSize:"13.5px",fontWeight:500,color:T.text,margin:0}}>{d}</p><p style={{fontSize:"12px",color:T.textSub,margin:"2px 0 0"}}>{s}</p></div>{cur?<span style={{fontSize:"11.5px",color:T.green,fontWeight:600}}>Atual</span>:<button style={{background:"none",border:"none",color:T.red,fontSize:"12.5px",fontWeight:600,cursor:"pointer"}}>Encerrar</button>}</div>))}
+    {[["Este dispositivo","Sessão atual",true]].map(([d,s,cur])=>(<div key={d} style={{display:"flex",alignItems:"center",gap:"12px",padding:"11px 0",borderBottom:`1px solid ${T.border}`}}><span style={{color:T.textSub}}><PMI d="M5 3h14a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1ZM12 18h.01"/></span><div style={{flex:1}}><p style={{fontSize:"13.5px",fontWeight:500,color:T.text,margin:0}}>{d}</p><p style={{fontSize:"12px",color:T.textSub,margin:"2px 0 0"}}>{s}</p></div>{cur?<span style={{fontSize:"11.5px",color:T.green,fontWeight:600}}>Atual</span>:<button style={{background:"none",border:"none",color:T.red,fontSize:"12.5px",fontWeight:600,cursor:"pointer"}}>Encerrar</button>}</div>))}
   </div>;
 }
 function PMPlano(){
   return <div>
-    <div style={{background:"linear-gradient(140deg,#4ADE80,#22C55E 42%,#166534)",borderRadius:"18px",padding:"22px",color:"#fff",marginBottom:"18px"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}><div><p style={{fontSize:"12px",fontWeight:700,letterSpacing:".1em",textTransform:"uppercase",opacity:.85,margin:0}}>Plano atual</p><p style={{fontSize:"26px",fontWeight:700,margin:"4px 0 0"}}>Família</p></div><span style={{background:"rgba(255,255,255,.2)",padding:"6px 12px",borderRadius:"999px",fontSize:"12px",fontWeight:600}}>Ativo</span></div><p style={{fontSize:"13px",opacity:.9,margin:"10px 0 0"}}>R$ 69/mês · 2 MEIs incluídos</p></div>
-    <PMRow label="Forma de pagamento" desc="Mastercard •••• 4821" right={<button style={pmBtnGhost()}>Alterar</button>}/>
+    <div style={{background:"linear-gradient(140deg,#4ADE80,#22C55E 42%,#166534)",borderRadius:"18px",padding:"22px",color:"#fff",marginBottom:"18px"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}><div><p style={{fontSize:"12px",fontWeight:700,letterSpacing:".1em",textTransform:"uppercase",opacity:.85,margin:0}}>Plano atual</p><p style={{fontSize:"26px",fontWeight:700,margin:"4px 0 0"}}>Gratuito</p></div><span style={{background:"rgba(255,255,255,.2)",padding:"6px 12px",borderRadius:"999px",fontSize:"12px",fontWeight:600}}>Ativo</span></div><p style={{fontSize:"13px",opacity:.9,margin:"10px 0 0"}}>Acesso completo durante o período de testes</p></div>
+    <PMRow label="Forma de pagamento" desc="Nenhuma cadastrada" right={<button style={pmBtnGhost()}>Adicionar</button>}/>
     <PMRow label="Histórico de faturas" desc="Baixe seus recibos" right={<button style={pmBtnGhost()}>Ver</button>}/>
     <PMRow label="Trocar de plano" desc="Essencial · Pro · Família" right={<button style={pmBtnGhost()}>Comparar</button>}/>
-    <button style={{background:"none",border:"none",color:T.red,fontSize:"13px",fontWeight:600,cursor:"pointer",marginTop:"14px",padding:0}}>Cancelar assinatura</button>
+    <button style={{background:"none",border:"none",color:T.red,fontSize:"13px",fontWeight:600,cursor:"pointer",marginTop:"14px",padding:0,opacity:.5}} disabled>Cancelar assinatura</button>
   </div>;
 }
 function PMDados({onExport}){
@@ -464,7 +512,7 @@ function PMDados({onExport}){
     <div style={{background:T.redLight,border:`1px solid ${T.red}30`,borderRadius:"12px",padding:"16px",marginTop:"18px"}}><p style={{fontSize:"13.5px",fontWeight:700,color:T.red,margin:"0 0 4px"}}>Zona de perigo</p><p style={{fontSize:"12.5px",color:T.textSub,margin:"0 0 12px",lineHeight:1.45}}>Excluir a conta apaga seus dados permanentemente. Numa conta de casal, o Lucas mantém os dados dele.</p><div style={{display:"flex",gap:"10px",flexWrap:"wrap"}}><button style={{padding:"9px 16px",borderRadius:"10px",border:`1.5px solid ${T.red}`,background:"transparent",color:T.red,fontWeight:600,fontSize:"13px",cursor:"pointer"}}>Sair da conta conjunta</button><button style={{padding:"9px 16px",borderRadius:"10px",border:"none",background:T.red,color:"#fff",fontWeight:600,fontSize:"13px",cursor:"pointer"}}>Excluir minha conta</button></div></div>
   </div>;
 }
-function ProfileModal({dark,onToggleTheme,onClose,onLogout,onExport,user,isMobile}){
+function ProfileModal({dark,onToggleTheme,onClose,onLogout,onExport,user,members,accountId,onUpdateMember,onInvite,onSaveProfile,isMobile}){
   const [sec,setSec]=useState("perfil");
   const Body={perfil:PMPerfil,casal:PMCasal,prefs:PMPrefs,regra:PMRegra,notif:PMNotif,seg:PMSeg,plano:PMPlano,dados:PMDados}[sec];
   const cur=PM_SECTIONS.find(s=>s.k===sec);
@@ -486,7 +534,7 @@ function ProfileModal({dark,onToggleTheme,onClose,onLogout,onExport,user,isMobil
             <div><h2 style={{fontSize:"18px",fontWeight:700,color:T.text,margin:0}}>{cur.label}</h2><p style={{fontSize:"12.5px",color:T.textSub,margin:"2px 0 0"}}>{subt}</p></div>
             <button onClick={onClose} style={{width:"36px",height:"36px",borderRadius:"10px",border:`1px solid ${T.border}`,background:T.surface,color:T.textSub,cursor:"pointer",display:"grid",placeItems:"center",flexShrink:0}}><PMI d="M18 6 6 18M6 6l12 12"/></button>
           </div>
-          <div style={{flex:1,overflowY:"auto",padding:"22px"}}><Body user={user} dark={dark} onToggleTheme={onToggleTheme} onExport={onExport}/></div>
+          <div style={{flex:1,overflowY:"auto",padding:"22px"}}><Body user={user} members={members} accountId={accountId} onUpdateMember={onUpdateMember} onInvite={onInvite} onSaveProfile={onSaveProfile} dark={dark} onToggleTheme={onToggleTheme} onExport={onExport}/></div>
           {isMobile&&<div style={{padding:"12px 22px",borderTop:`1px solid ${T.border}`}}><button onClick={onLogout} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:"8px",padding:"12px",borderRadius:"11px",border:`1px solid ${T.red}40`,cursor:"pointer",background:T.redLight,color:T.red,fontWeight:600,fontSize:"14px"}}><PMI d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" s={17}/>Sair da conta</button></div>}
         </div>
       </div>
@@ -753,13 +801,23 @@ export default function App(){
   const [authUser, setAuthUser] = useState(null);
   const [accountId, setAccountId] = useState(null);
   const [accountReady, setAccountReady] = useState(false);
+  const [members, setMembers] = useState([]);
+  const loadMembers = async(acc)=>{
+    if(!acc) return;
+    try{
+      const supabase=createClient();
+      const {data:rows}=await supabase.from("user_accounts").select("user_id,email,name,role").eq("account_id",acc);
+      if(Array.isArray(rows)) setMembers(rows);
+    }catch(e){ /* colunas email/name podem não existir ainda */ }
+  };
   useEffect(()=>{ let cancel=false; (async()=>{
     try{
       const supabase=createClient();
       const {data}=await supabase.auth.getUser();
       const u=data?.user;
       if(!u){ if(!cancel){ setAccountReady(true); } return; }
-      setAuthUser({ email:u.email, name:(u.user_metadata&&(u.user_metadata.name||u.user_metadata.full_name))||(u.email?u.email.split("@")[0]:"Você") });
+      const myName=(u.user_metadata&&(u.user_metadata.name||u.user_metadata.full_name))||(u.email?u.email.split("@")[0]:"Você");
+      setAuthUser({ id:u.id, email:u.email, name:myName });
       // Resolve a conta (household) deste usuário — isola cada pessoa, mantém o casal junto
       let acc=null;
       try{
@@ -770,15 +828,59 @@ export default function App(){
           acc=u.id;
           await supabase.from("user_accounts").insert({user_id:u.id, account_id:acc, role:"admin"});
         }
+        // auto-cura: grava/atualiza nome e email do próprio vínculo (ignora se colunas não existem)
+        try{ await supabase.from("user_accounts").update({email:u.email, name:myName}).eq("user_id",u.id); }catch(_){}
+        // aceita convite pendente (se alguém te convidou para uma conta conjunta)
+        try{
+          const {data:joined}=await supabase.rpc("accept_pending_invite");
+          if(joined&&typeof joined==="string"&&joined!==acc){ acc=joined; }
+        }catch(_){ /* função ainda não criada no banco */ }
       }catch(e){
         // tabela ainda não existe → isola por usuário mesmo assim (nunca cai no "casal" global)
         console.error("user_accounts indisponível, isolando por user.id",e);
         acc=u.id;
       }
-      if(!cancel){ setAccountId(acc); setAccountReady(true); }
+      if(!cancel){ setAccountId(acc); setAccountReady(true); loadMembers(acc); }
     }catch(e){ console.error("Falha ao resolver conta",e); if(!cancel) setAccountReady(true); }
   })(); return ()=>{cancel=true;}; },[]);
   const handleLogout = async()=>{ try{ const supabase=createClient(); await supabase.auth.signOut(); }catch(e){} window.location.href="/login"; };
+  // ── Conta conjunta: editar membro, convidar, aceitar convite ───────────────
+  const updateMember = async(userId, patch)=>{
+    try{
+      const supabase=createClient();
+      const {error}=await supabase.from("user_accounts").update(patch).eq("user_id",userId);
+      if(error)throw error;
+      setMembers(ms=>ms.map(m=>m.user_id===userId?{...m,...patch}:m));
+      showToast("✅ Atualizado!");
+    }catch(e){ console.error(e); showToast("Não foi possível atualizar (rode o SQL novo)","error"); }
+  };
+  const sendInvite = async(email, role)=>{
+    const em=(email||"").trim().toLowerCase();
+    if(!em||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){ showToast("E-mail inválido","error"); return false; }
+    try{
+      const supabase=createClient();
+      const {error}=await supabase.from("convites").insert({account_id:accountId, email:em, role:role||"editar", created_by:authUser?.id});
+      if(error)throw error;
+      showToast("✅ Convite criado! Quando "+em+" criar a conta, entra automático.");
+      return true;
+    }catch(e){ console.error(e); showToast("Falha ao convidar (rode o SQL novo)","error"); return false; }
+  };
+  const saveProfile = async({name,email,password})=>{
+    try{
+      const supabase=createClient();
+      const payload={};
+      if(name) payload.data={...(payload.data||{}),name};
+      if(email) payload.email=email;
+      if(password) payload.password=password;
+      if(Object.keys(payload).length){ const {error}=await supabase.auth.updateUser(payload); if(error)throw error; }
+      // atualiza diretório (display) do próprio vínculo
+      const patch={}; if(name)patch.name=name; if(email)patch.email=email;
+      if(Object.keys(patch).length&&authUser?.id){ try{ await supabase.from("user_accounts").update(patch).eq("user_id",authUser.id); }catch(_){} }
+      setAuthUser(u=>({...u,...(name?{name}:{}),...(email?{email}:{})}));
+      showToast(email?"✅ Salvo! Confirme o novo e-mail na sua caixa de entrada.":"✅ Perfil atualizado!");
+      return true;
+    }catch(e){ console.error(e); showToast(e.message||"Erro ao salvar perfil","error"); return false; }
+  };
   const exportData = ()=>{ const b=new Blob([JSON.stringify({allYearsData,cartoes,usoCartoes,pagamentos,cadastros,mei_data:meiData},null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=`greenmind_dados.json`;a.click();showToast("Exportado!"); };
   const [showModal, setShowModal] = useState(null); // tipo do modal
   const [editingItem, setEditingItem] = useState(null);
@@ -1137,7 +1239,7 @@ export default function App(){
   };
 
   // ── Lançar por texto (IA) → insere no mês/ano da data ──────────────────────
-  const addParsedItem = (p) => {
+  const addParsedItem = async (p) => {
     const valor=parseFloat(String(p.valor).replace(",","."))||0;
     if(!p.desc||!valor){ showToast("Confira descrição e valor","error"); return; }
     const d=new Date((p.date||today)+"T12:00:00");
@@ -1147,17 +1249,26 @@ export default function App(){
     if(key==="receitas") item={id:uid(),desc:p.desc,valor,date:p.date,ref:"",cliente:"",categoria:p.categoria,formaRec:p.meioPag||"pix",banco:""};
     else if(key==="investimentos") item={id:uid(),desc:p.desc,valor,date:p.date,ref:"",categoria:p.categoria,investido:true,banco:""};
     else item={id:uid(),desc:p.desc,valor,date:p.date,ref:"",fornecedor:"",categoria:p.categoria,recorrente:false,formaPag:"avista",parcelas:1,meioPag:p.meioPag||"pix",pago:false};
-    setAllYearsData(all=>{
-      const yrKey=String(ty);
-      const base=(Array.isArray(all[yrKey])&&all[yrKey].length===12)
-        ? all[yrKey].map(m=>({...m,[key]:[...m[key]]}))
-        : emptyYear();
-      base[tm][key].push(item);
-      return {...all,[yrKey]:base};
-    });
+    // monta o novo estado completo (todos os anos) de forma síncrona p/ poder salvar já
+    const yrKey=String(ty);
+    const baseYear=(Array.isArray(allYearsData[yrKey])&&allYearsData[yrKey].length===12)
+      ? allYearsData[yrKey].map(m=>({...m,receitas:[...m.receitas],despesas:[...m.despesas],investimentos:[...m.investimentos],emprestimos:[...m.emprestimos]}))
+      : emptyYear();
+    baseYear[tm][key].push(item);
+    const newAllYears={...allYearsData,[yrKey]:baseYear};
+    setAllYearsData(newAllYears);
     setShowQuickAdd(false);
+    setCurrentYear(ty); setCurrentMonth(tm);
     const MESN=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
-    showToast(`✅ ${p.tipo==="receita"?"Receita":p.tipo==="investimento"?"Investimento":"Despesa"} de ${fmt(valor)} em ${MESN[tm]}/${ty}`);
+    const rotulo=p.tipo==="receita"?"Receita":p.tipo==="investimento"?"Investimento":"Despesa";
+    // PERSISTE no Supabase imediatamente (igual aos outros saves)
+    try{
+      await saveToSupa({allYearsData:newAllYears,cartoes,uso_cartoes:usoCartoes,pagamentos,sync_url:syncUrl,cadastros,mei_data:meiData});
+      showToast(`✅ ${rotulo} de ${fmt(valor)} salva em ${MESN[tm]}/${ty}`);
+    }catch(e){
+      console.error("Falha ao salvar lançamento por IA",e);
+      showToast("Lançado, mas falhou ao sincronizar — toque em Salvar","error");
+    }
   };
 
   const removeItem=(tipo,id)=>{
@@ -3482,7 +3593,7 @@ Cancelar = Dar baixa só nesta parcela`);
       {showModal&&<LancModal tipo={showModal} form={showModal==="receita"?recForm:showModal==="despesa"?despForm:showModal==="investimento"?invForm:empForm} setForm={showModal==="receita"?setRecForm:showModal==="despesa"?setDespForm:showModal==="investimento"?setInvForm:setEmpForm} onSave={()=>addItem(showModal)} onClose={()=>setShowModal(null)} cadastros={cadastros} today={today}/>}
 
       {/* MODAL PERFIL & CONFIGURAÇÕES */}
-      {showProfile&&<ProfileModal dark={dark} onToggleTheme={toggleTheme} onClose={()=>setShowProfile(false)} onLogout={handleLogout} onExport={exportData} user={authUser} isMobile={isMobile}/>}
+      {showProfile&&<ProfileModal dark={dark} onToggleTheme={toggleTheme} onClose={()=>setShowProfile(false)} onLogout={handleLogout} onExport={exportData} user={authUser} members={members} accountId={accountId} onUpdateMember={updateMember} onInvite={sendInvite} onSaveProfile={saveProfile} isMobile={isMobile}/>}
 
       {/* MODAL LANÇAR POR TEXTO (IA) */}
       {showQuickAdd&&<QuickAddModal today={today} dark={dark} onClose={()=>setShowQuickAdd(false)} onConfirm={addParsedItem}/>}
