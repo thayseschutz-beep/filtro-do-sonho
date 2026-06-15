@@ -18,10 +18,7 @@ const LIMITE_MEI_ANUAL = 81000;
 const LIMITE_MEI_MENSAL = LIMITE_MEI_ANUAL / 12; // R$ 6.750
 const DAS_MEI_2026 = { inss: 75.90, iss: 5.00, icms: 1.00, totalServicos: 80.90, totalComercio: 76.90 };
 const emptyMei = () => ({
-  meis: [
-    { id:"thayse", nome:"Thayse", cor:"#7C3AED", limiteAnual:81000, tipo:"servicos", dataAbertura:"", cnpj:"" },
-    { id:"lucas",  nome:"Lucas",  cor:"#0284C7", limiteAnual:81000, tipo:"servicos", dataAbertura:"", cnpj:"" },
-  ],
+  meis: [],
   notas: []
 });
 const emptyNFForm = (today="") => ({ meiId:"", competencia:"", dataEmissao:today, numeroNF:"", valor:"", prestador:"", tomador:"", descricao:"" });
@@ -345,16 +342,31 @@ const PM_SECTIONS = [
   {k:"plano",label:"Plano & assinatura",ic:"plano"},
   {k:"dados",label:"Dados & privacidade",ic:"dados"},
 ];
+// ── Preferências persistentes (localStorage) ────────────────────────────────
+const GM_PREFS_KEY="gm_prefs";
+function gmGetPrefs(){ try{ return JSON.parse(localStorage.getItem(GM_PREFS_KEY)||"{}"); }catch(e){ return {}; } }
+function gmGetPref(key,def){ const p=gmGetPrefs(); return (p&&key in p)?p[key]:def; }
+function gmSetPref(key,value){ try{ const p=gmGetPrefs(); p[key]=value; localStorage.setItem(GM_PREFS_KEY,JSON.stringify(p)); }catch(e){} }
+function usePref(key,def){
+  const [v,setV]=useState(()=>gmGetPref(key,def));
+  const set=(nv)=>{ const val=typeof nv==="function"?nv(v):nv; setV(val); gmSetPref(key,val); };
+  return [v,set];
+}
+
 function PMToggle({on,onClick}){return <button onClick={onClick} style={{width:"44px",height:"26px",borderRadius:"999px",border:"none",cursor:"pointer",padding:"3px",background:on?T.green:T.borderStrong,transition:".2s",flexShrink:0}}><span style={{display:"block",width:"20px",height:"20px",borderRadius:"50%",background:"#fff",transform:on?"translateX(18px)":"translateX(0)",transition:".2s",boxShadow:"0 1px 3px rgba(0,0,0,.3)"}}/></button>;}
 function PMField({label,children,hint}){return <div style={{marginBottom:"16px"}}><label style={{display:"block",fontSize:"12.5px",fontWeight:600,color:T.textSub,marginBottom:"6px"}}>{label}</label>{children}{hint&&<p style={{fontSize:"11.5px",color:T.textMuted,margin:"5px 0 0"}}>{hint}</p>}</div>;}
 function PMRow({label,desc,right}){return <div style={{display:"flex",alignItems:"center",gap:"14px",padding:"13px 0",borderBottom:`1px solid ${T.border}`}}><div style={{flex:1}}><p style={{fontSize:"14px",fontWeight:500,color:T.text,margin:0}}>{label}</p>{desc&&<p style={{fontSize:"12.5px",color:T.textSub,margin:"2px 0 0",lineHeight:1.4}}>{desc}</p>}</div>{right}</div>;}
 const pmInp = ()=>({width:"100%",background:T.surfaceAlt,border:`1.5px solid ${T.borderStrong}`,borderRadius:"10px",padding:"11px 13px",color:T.text,fontSize:"14px",outline:"none"});
 const pmBtnGreen = ()=>({padding:"11px 20px",borderRadius:"11px",border:"none",cursor:"pointer",background:"linear-gradient(140deg,#22C55E,#166534)",color:"#fff",fontWeight:600,fontSize:"14px",boxShadow:"0 8px 18px -8px rgba(34,197,94,.7)"});
 const pmBtnGhost = ()=>({padding:"10px 18px",borderRadius:"11px",border:`1.5px solid ${T.borderStrong}`,cursor:"pointer",background:"transparent",color:T.text,fontWeight:600,fontSize:"13px"});
-function PMAvatar({name,color,size=44}){const initials=(name||"?").split(" ").map(w=>w[0]).slice(0,2).join("").toUpperCase();return <div style={{width:size,height:size,borderRadius:"50%",background:color,color:"#fff",display:"grid",placeItems:"center",fontWeight:700,fontSize:size*0.36+"px",flexShrink:0,boxShadow:"0 2px 8px rgba(0,0,0,.18)"}}>{initials}</div>;}
+function PMAvatar({name,color,size=44,photo}){const initials=(name||"?").split(" ").map(w=>w[0]).slice(0,2).join("").toUpperCase();if(photo)return <img src={photo} alt={name} style={{width:size,height:size,borderRadius:"50%",objectFit:"cover",flexShrink:0,boxShadow:"0 2px 8px rgba(0,0,0,.18)"}}/>;return <div style={{width:size,height:size,borderRadius:"50%",background:color,color:"#fff",display:"grid",placeItems:"center",fontWeight:700,fontSize:size*0.36+"px",flexShrink:0,boxShadow:"0 2px 8px rgba(0,0,0,.18)"}}>{initials}</div>;}
 
 function PMPerfil({user,onSaveProfile}){
   const nome=user?.name||"Você"; const email=user?.email||"—";
+  const [photo,setPhoto]=usePref("avatar",null);
+  const fileRef=useRef(null);
+  const onPhoto=(e)=>{ const f=e.target.files&&e.target.files[0]; if(!f)return; if(f.size>3*1024*1024){alert("Imagem muito grande (máx 3MB)");return;} const r=new FileReader(); r.onload=()=>{ // redimensiona p/ ~256px e salva leve
+      const img=new Image(); img.onload=()=>{ const c=document.createElement("canvas"); const S=256; const sc=Math.min(S/img.width,S/img.height,1); c.width=img.width*sc; c.height=img.height*sc; c.getContext("2d").drawImage(img,0,0,c.width,c.height); setPhoto(c.toDataURL("image/jpeg",0.82)); }; img.src=r.result; }; r.readAsDataURL(f); };
   const [form,setForm]=useState({name:user?.name||"",email:user?.email||"",phone:"",pass:""});
   const [saving,setSaving]=useState(false);
   useEffect(()=>{ setForm(f=>({...f,name:user?.name||"",email:user?.email||""})); },[user]);
@@ -371,9 +383,10 @@ function PMPerfil({user,onSaveProfile}){
     setSaving(false);
   };
   return <div>
+    <input ref={fileRef} type="file" accept="image/*" onChange={onPhoto} style={{display:"none"}}/>
     <div style={{display:"flex",alignItems:"center",gap:"16px",marginBottom:"22px"}}>
-      <div style={{position:"relative"}}><PMAvatar name={form.name||nome} color="#166534" size={72}/><button title="Trocar foto (em breve)" style={{position:"absolute",bottom:-2,right:-2,width:"26px",height:"26px",borderRadius:"50%",border:`2px solid ${T.surface}`,background:T.green,color:"#fff",cursor:"pointer",display:"grid",placeItems:"center"}}><PMI d="M12 5v14M5 12h14" s={13}/></button></div>
-      <div><p style={{fontSize:"18px",fontWeight:700,color:T.text,margin:0}}>{form.name||nome}</p><p style={{fontSize:"13px",color:T.textSub,margin:"3px 0 0"}}>{form.email||email}</p></div>
+      <div style={{position:"relative"}}><PMAvatar name={form.name||nome} color="#166534" size={72} photo={photo}/><button onClick={()=>fileRef.current&&fileRef.current.click()} title="Trocar foto" style={{position:"absolute",bottom:-2,right:-2,width:"26px",height:"26px",borderRadius:"50%",border:`2px solid ${T.surface}`,background:T.green,color:"#fff",cursor:"pointer",display:"grid",placeItems:"center"}}><PMI d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" s={12}/></button></div>
+      <div style={{flex:1}}><p style={{fontSize:"18px",fontWeight:700,color:T.text,margin:0}}>{form.name||nome}</p><p style={{fontSize:"13px",color:T.textSub,margin:"3px 0 0"}}>{form.email||email}</p>{photo&&<button onClick={()=>setPhoto(null)} style={{background:"none",border:"none",color:T.red,fontSize:"12px",fontWeight:600,cursor:"pointer",padding:"4px 0 0"}}>Remover foto</button>}</div>
     </div>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
       <PMField label="Nome"><input style={pmInp()} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></PMField>
@@ -462,18 +475,21 @@ function PMCasal({user,members,accountId,onUpdateMember,onInvite}){
   </div>;
 }
 function PMPrefs({dark,onToggleTheme}){
-  const [moeda,setMoeda]=useState("BRL"),[fech,setFech]=useState("1");
+  const [moeda,setMoeda]=usePref("moeda","BRL");
+  const [fech,setFech]=usePref("fechamento","1");
+  const [semana,setSemana]=usePref("semana","domingo");
   return <div>
+    <p style={{fontSize:"11.5px",color:T.green,margin:"0 0 14px",fontWeight:600}}>✓ Alterações salvas automaticamente neste aparelho</p>
     <p style={{fontSize:"13px",fontWeight:700,color:T.text,margin:"0 0 4px"}}>Aparência</p>
     <PMRow label="Tema" desc="Claro ou escuro" right={<div style={{display:"flex",gap:"4px",background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:"10px",padding:"3px"}}>{[["light","Claro"],["dark","Escuro"]].map(([k,l])=>{const on=(k==="dark")===dark;return <button key={k} onClick={()=>{if(on)return;onToggleTheme();}} style={{border:"none",cursor:"pointer",fontSize:"12.5px",fontWeight:600,padding:"7px 14px",borderRadius:"8px",background:on?T.surface:"transparent",color:on?T.text:T.textSub,boxShadow:on?"0 1px 3px rgba(0,0,0,.15)":"none"}}>{l}</button>;})}</div>}/>
     <p style={{fontSize:"13px",fontWeight:700,color:T.text,margin:"22px 0 4px"}}>Regional</p>
     <PMRow label="Moeda" right={<select value={moeda} onChange={e=>setMoeda(e.target.value)} style={{...pmInp(),width:"auto"}}><option value="BRL">Real (R$)</option><option value="USD">Dólar (US$)</option><option value="EUR">Euro (€)</option></select>}/>
-    <PMRow label="Dia de fechamento do mês" desc="Quando seu mês financeiro vira (ex.: dia do salário)" right={<select value={fech} onChange={e=>setFech(e.target.value)} style={{...pmInp(),width:"auto"}}>{[1,5,10,15,20,25].map(d=><option key={d} value={d}>Dia {d}</option>)}</select>}/>
-    <PMRow label="Começo da semana" right={<select style={{...pmInp(),width:"auto"}}><option>Domingo</option><option>Segunda</option></select>}/>
+    <PMRow label="Dia de fechamento do mês" desc="Quando seu mês financeiro vira (ex.: dia do salário)" right={<select value={fech} onChange={e=>setFech(e.target.value)} style={{...pmInp(),width:"auto"}}>{[1,5,10,15,20,25].map(d=><option key={d} value={String(d)}>Dia {d}</option>)}</select>}/>
+    <PMRow label="Começo da semana" right={<select value={semana} onChange={e=>setSemana(e.target.value)} style={{...pmInp(),width:"auto"}}><option value="domingo">Domingo</option><option value="segunda">Segunda</option></select>}/>
   </div>;
 }
 function PMRegra(){
-  const [v,setV]=useState({ess:50,pes:30,inv:20});const total=v.ess+v.pes+v.inv;
+  const [v,setV]=usePref("regra",{ess:50,pes:30,inv:20});const total=v.ess+v.pes+v.inv;
   const bars=[["ess","Essencial","#38BDF8","Moradia, contas, mercado"],["pes","Pessoal","#FBBF24","Lazer, roupas, hobbies"],["inv","Investir & metas","#22C55E","Poupança, reserva, sonhos"]];
   return <div>
     <p style={{fontSize:"13.5px",color:T.textSub,margin:"0 0 18px",lineHeight:1.5}}>O padrão é <b style={{color:T.text}}>50/30/20</b>, mas você pode ajustar para o que faz sentido pra vocês (ex.: 60/20/20).</p>
@@ -482,12 +498,12 @@ function PMRegra(){
   </div>;
 }
 function PMNotif(){
-  const [n,setN]=useState({fatura:true,lancar:true,meta:true,resumo:true,mei:true,casal:true});
+  const [n,setN]=usePref("notif",{fatura:true,lancar:true,meta:true,resumo:true,mei:true,casal:true});
   const items=[["fatura","Vencimento de faturas","Avisa 3 dias antes de cada fatura"],["lancar","Lembrete de lançar","Toda noite, se você não registrou nada"],["meta","Meta atingida","Quando você bate um objetivo 🎉"],["resumo","Resumo mensal","No 1º dia do mês, um balanço do mês anterior"],["mei","Alerta de limite MEI","Quando a projeção passar de 80% do limite"],["casal","Atividade compartilhada","Quando alguém da conta adiciona ou edita algo"]];
   return <div>{items.map(([k,l,d])=><PMRow key={k} label={l} desc={d} right={<PMToggle on={n[k]} onClick={()=>setN(s=>({...s,[k]:!s[k]}))}/>}/>)}</div>;
 }
 function PMSeg(){
-  const [bio,setBio]=useState(true),[twofa,setTwofa]=useState(false);
+  const [bio,setBio]=usePref("bio",false),[twofa,setTwofa]=usePref("twofa",false);
   return <div>
     <PMRow label="Desbloqueio por biometria" desc="Use Face ID / digital ao abrir o app" right={<PMToggle on={bio} onClick={()=>setBio(!bio)}/>}/>
     <PMRow label="PIN de 4 dígitos" desc="Alternativa à biometria" right={<button style={pmBtnGhost()}>Configurar</button>}/>
@@ -505,14 +521,21 @@ function PMPlano(){
     <button style={{background:"none",border:"none",color:T.red,fontSize:"13px",fontWeight:600,cursor:"pointer",marginTop:"14px",padding:0,opacity:.5}} disabled>Cancelar assinatura</button>
   </div>;
 }
-function PMDados({onExport}){
+function PMDados({onExport,onReset}){
   return <div>
     <PMRow label="Backup automático" desc="Seus dados ficam salvos na nuvem com segurança" right={<PMToggle on={true} onClick={()=>{}}/>}/>
     <PMRow label="Exportar meus dados" desc="Baixe tudo em JSON (LGPD)" right={<button style={pmBtnGhost()} onClick={onExport}>Exportar</button>}/>
-    <div style={{background:T.redLight,border:`1px solid ${T.red}30`,borderRadius:"12px",padding:"16px",marginTop:"18px"}}><p style={{fontSize:"13.5px",fontWeight:700,color:T.red,margin:"0 0 4px"}}>Zona de perigo</p><p style={{fontSize:"12.5px",color:T.textSub,margin:"0 0 12px",lineHeight:1.45}}>Excluir a conta apaga seus dados permanentemente. Numa conta de casal, o Lucas mantém os dados dele.</p><div style={{display:"flex",gap:"10px",flexWrap:"wrap"}}><button style={{padding:"9px 16px",borderRadius:"10px",border:`1.5px solid ${T.red}`,background:"transparent",color:T.red,fontWeight:600,fontSize:"13px",cursor:"pointer"}}>Sair da conta conjunta</button><button style={{padding:"9px 16px",borderRadius:"10px",border:"none",background:T.red,color:"#fff",fontWeight:600,fontSize:"13px",cursor:"pointer"}}>Excluir minha conta</button></div></div>
+    <div style={{background:T.redLight,border:`1px solid ${T.red}30`,borderRadius:"12px",padding:"16px",marginTop:"18px"}}>
+      <p style={{fontSize:"13.5px",fontWeight:700,color:T.red,margin:"0 0 4px"}}>Zona de perigo</p>
+      <p style={{fontSize:"12.5px",color:T.textSub,margin:"0 0 12px",lineHeight:1.45}}>Ações abaixo não podem ser desfeitas. Recomendamos exportar seus dados antes.</p>
+      <div style={{display:"flex",gap:"10px",flexWrap:"wrap"}}>
+        <button onClick={()=>onReset&&onReset()} style={{padding:"9px 16px",borderRadius:"10px",border:`1.5px solid ${T.red}`,background:"transparent",color:T.red,fontWeight:600,fontSize:"13px",cursor:"pointer"}}>Zerar tudo (recomeçar do zero)</button>
+      </div>
+      <p style={{fontSize:"11px",color:T.textMuted,margin:"10px 2px 0",lineHeight:1.4}}>Apaga lançamentos, cartões, metas e MEIs desta conta, voltando ao estado inicial. Seu login continua o mesmo.</p>
+    </div>
   </div>;
 }
-function ProfileModal({dark,onToggleTheme,onClose,onLogout,onExport,user,members,accountId,onUpdateMember,onInvite,onSaveProfile,isMobile}){
+function ProfileModal({dark,onToggleTheme,onClose,onLogout,onExport,onReset,user,members,accountId,onUpdateMember,onInvite,onSaveProfile,isMobile}){
   const [sec,setSec]=useState("perfil");
   const Body={perfil:PMPerfil,casal:PMCasal,prefs:PMPrefs,regra:PMRegra,notif:PMNotif,seg:PMSeg,plano:PMPlano,dados:PMDados}[sec];
   const cur=PM_SECTIONS.find(s=>s.k===sec);
@@ -534,7 +557,7 @@ function ProfileModal({dark,onToggleTheme,onClose,onLogout,onExport,user,members
             <div><h2 style={{fontSize:"18px",fontWeight:700,color:T.text,margin:0}}>{cur.label}</h2><p style={{fontSize:"12.5px",color:T.textSub,margin:"2px 0 0"}}>{subt}</p></div>
             <button onClick={onClose} style={{width:"36px",height:"36px",borderRadius:"10px",border:`1px solid ${T.border}`,background:T.surface,color:T.textSub,cursor:"pointer",display:"grid",placeItems:"center",flexShrink:0}}><PMI d="M18 6 6 18M6 6l12 12"/></button>
           </div>
-          <div style={{flex:1,overflowY:"auto",padding:"22px"}}><Body user={user} members={members} accountId={accountId} onUpdateMember={onUpdateMember} onInvite={onInvite} onSaveProfile={onSaveProfile} dark={dark} onToggleTheme={onToggleTheme} onExport={onExport}/></div>
+          <div style={{flex:1,overflowY:"auto",padding:"22px"}}><Body user={user} members={members} accountId={accountId} onUpdateMember={onUpdateMember} onInvite={onInvite} onSaveProfile={onSaveProfile} onReset={onReset} dark={dark} onToggleTheme={onToggleTheme} onExport={onExport}/></div>
           {isMobile&&<div style={{padding:"12px 22px",borderTop:`1px solid ${T.border}`}}><button onClick={onLogout} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:"8px",padding:"12px",borderRadius:"11px",border:`1px solid ${T.red}40`,cursor:"pointer",background:T.redLight,color:T.red,fontWeight:600,fontSize:"14px"}}><PMI d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" s={17}/>Sair da conta</button></div>}
         </div>
       </div>
@@ -797,6 +820,7 @@ export default function App(){
   const toggleTheme = () => setDark(d=>{ const n=!d; try{ localStorage.setItem('gm_theme', n?'dark':'light'); }catch(e){} return n; });
   applyTheme(dark);
   const [showProfile, setShowProfile] = useState(false);
+  const [avatarPhoto, setAvatarPhoto] = useState(()=>{ try{ return gmGetPref("avatar",null); }catch(e){ return null; } });
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [authUser, setAuthUser] = useState(null);
   const [accountId, setAccountId] = useState(null);
@@ -882,6 +906,18 @@ export default function App(){
     }catch(e){ console.error(e); showToast(e.message||"Erro ao salvar perfil","error"); return false; }
   };
   const exportData = ()=>{ const b=new Blob([JSON.stringify({allYearsData,cartoes,usoCartoes,pagamentos,cadastros,mei_data:meiData},null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=`greenmind_dados.json`;a.click();showToast("Exportado!"); };
+  const resetAllData = async()=>{
+    const ok=typeof window!=="undefined"?window.confirm("Tem certeza que deseja ZERAR TUDO?\n\nIsto apaga lançamentos, cartões, metas e MEIs desta conta e volta ao estado inicial. Não dá para desfazer.\n\nDica: exporte seus dados antes (botão Exportar)."):false;
+    if(!ok) return;
+    const freshYear=emptyYear();
+    const freshAll={[String(new Date().getFullYear())]:freshYear};
+    setAllYearsData(freshAll);
+    setCartoes([]); setUsoCartoes([]); setPagamentos({});
+    setCadastros(emptyCadastros()); setMeiData(emptyMei());
+    try{ await saveToSupa({allYearsData:freshAll,cartoes:[],uso_cartoes:[],pagamentos:{},sync_url:syncUrl,cadastros:emptyCadastros(),mei_data:emptyMei()}); showToast("✅ Tudo zerado — recomeçando do zero"); }
+    catch(e){ console.error(e); showToast("Zerado localmente, mas falhou ao sincronizar","error"); }
+    setShowProfile(false);
+  };
   const [showModal, setShowModal] = useState(null); // tipo do modal
   const [editingItem, setEditingItem] = useState(null);
   const [recForm, setRecForm] = useState(emptyRecForm(today));
@@ -1233,9 +1269,20 @@ export default function App(){
       item={id:uid(),desc:f.desc,valor:valParcEmp,valorTotal:valTotalEmp,date:f.data,ref:f.ref,parafem:f.parafem,valorParcela:valParcEmp,parcelas:parcEmp,dataVenc1:f.dataVenc1,dataVencN:f.dataVencN,meioPag:f.meioPag,pago:f.pago};
       setEmpForm(emptyEmpForm(today));
     }
-    setData(d=>d.map((m,i)=>i===currentMonth?{...m,[key]:[...m[key],item]}:m));
-    setShowModal(null);
-    showToast("Item adicionado!");
+    // ── Respeita a DATA escolhida (mês/ano), não o mês atual ──────
+    {
+      const dd=new Date((item.date||today)+"T12:00:00");
+      const ity=dd.getFullYear(), itm=dd.getMonth();
+      const yrKey=String(ity);
+      const baseYear=(Array.isArray(allYearsData[yrKey])&&allYearsData[yrKey].length===12)
+        ? allYearsData[yrKey].map(m=>({...m,receitas:[...m.receitas],despesas:[...m.despesas],investimentos:[...m.investimentos],emprestimos:[...m.emprestimos]}))
+        : emptyYear();
+      baseYear[itm][key].push(item);
+      setAllYearsData({...allYearsData,[yrKey]:baseYear});
+      setShowModal(null);
+      if(ity!==currentYear||itm!==currentMonth){ setCurrentYear(ity); setCurrentMonth(itm); showToast(`✅ Lançado em ${MONTHS[itm]}/${ity}`); }
+      else showToast("Item adicionado!");
+    }
   };
 
   // ── Lançar por texto (IA) → insere no mês/ano da data ──────────────────────
@@ -1405,7 +1452,7 @@ Cancelar = Dar baixa só nesta parcela`);
   };
 
   const handleSave=async()=>{
-    try{await saveToSupa({allYearsData:{...allYearsData,[String(currentYear)]:safeData},cartoes,uso_cartoes:usoCartoes,pagamentos,sync_url:syncUrl,cadastros,mei_data:meiData});showToast("✅ Salvo! Lucas verá em instantes.");}
+    try{await saveToSupa({allYearsData:{...allYearsData,[String(currentYear)]:safeData},cartoes,uso_cartoes:usoCartoes,pagamentos,sync_url:syncUrl,cadastros,mei_data:meiData});showToast("✅ Tudo salvo!");}
     catch(e){console.error(e);showToast("Erro ao salvar","error");}
   };
 
@@ -1502,8 +1549,10 @@ Cancelar = Dar baixa só nesta parcela`);
                 ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7"/></svg>
                 : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4 7 7 0 1 0 20 14.5Z"/></svg>}
             </button>
-            <button onClick={()=>setShowProfile(true)} title="Perfil & configurações" style={{display:"flex",alignItems:"center",gap:"8px",height:"38px",padding:"0 10px 0 4px",borderRadius:"999px",border:`1px solid ${T.border}`,background:T.surface,cursor:"pointer",flexShrink:0}}>
-              <span style={{width:"30px",height:"30px",borderRadius:"50%",background:"linear-gradient(140deg,#22C55E,#166534)",color:"#fff",display:"grid",placeItems:"center",fontWeight:700,fontSize:"12px"}}>{((authUser?.name||"V").trim()[0]||"V").toUpperCase()}</span>
+            <button onClick={()=>setShowProfile(true)} title="Perfil & configurações" style={{display:"flex",alignItems:"center",gap:"8px",height:"38px",padding:avatarPhoto?"0 10px 0 4px":"0 10px 0 4px",borderRadius:"999px",border:`1px solid ${T.border}`,background:T.surface,cursor:"pointer",flexShrink:0}}>
+              {avatarPhoto
+                ? <img src={avatarPhoto} alt="" style={{width:"30px",height:"30px",borderRadius:"50%",objectFit:"cover"}}/>
+                : <span style={{width:"30px",height:"30px",borderRadius:"50%",background:"linear-gradient(140deg,#22C55E,#166534)",color:"#fff",display:"grid",placeItems:"center",fontWeight:700,fontSize:"12px"}}>{((authUser?.name||"V").trim()[0]||"V").toUpperCase()}</span>}
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={T.textSub} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
             </button>
           {activeSection!=="cartoes"&&activeSection!=="cadastros"&&activeSection!=="sincronizar"&&activeSection!=="mei"&&activeSection!=="buscar"&&activeSection!=="emitir"&&(
@@ -3593,7 +3642,7 @@ Cancelar = Dar baixa só nesta parcela`);
       {showModal&&<LancModal tipo={showModal} form={showModal==="receita"?recForm:showModal==="despesa"?despForm:showModal==="investimento"?invForm:empForm} setForm={showModal==="receita"?setRecForm:showModal==="despesa"?setDespForm:showModal==="investimento"?setInvForm:setEmpForm} onSave={()=>addItem(showModal)} onClose={()=>setShowModal(null)} cadastros={cadastros} today={today}/>}
 
       {/* MODAL PERFIL & CONFIGURAÇÕES */}
-      {showProfile&&<ProfileModal dark={dark} onToggleTheme={toggleTheme} onClose={()=>setShowProfile(false)} onLogout={handleLogout} onExport={exportData} user={authUser} members={members} accountId={accountId} onUpdateMember={updateMember} onInvite={sendInvite} onSaveProfile={saveProfile} isMobile={isMobile}/>}
+      {showProfile&&<ProfileModal dark={dark} onToggleTheme={toggleTheme} onClose={()=>{ try{ setAvatarPhoto(gmGetPref("avatar",null)); }catch(e){} setShowProfile(false); }} onLogout={handleLogout} onExport={exportData} onReset={resetAllData} user={authUser} members={members} accountId={accountId} onUpdateMember={updateMember} onInvite={sendInvite} onSaveProfile={saveProfile} isMobile={isMobile}/>}
 
       {/* MODAL LANÇAR POR TEXTO (IA) */}
       {showQuickAdd&&<QuickAddModal today={today} dark={dark} onClose={()=>setShowQuickAdd(false)} onConfirm={addParsedItem}/>}
