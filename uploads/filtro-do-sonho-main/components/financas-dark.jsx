@@ -275,7 +275,7 @@ function LancModal({tipo,form,setForm,onSave,onClose,cadastros,today}){
 }
 
 // ── ItemList (fora do App) ─────────────────────────────────────────────────
-function ItemList({items,col,emptyMsg,onEdit,onRemove,onBaixa,tipo,selMode,selIds,onToggleSel,onAdiar}){
+function ItemList({items,col,emptyMsg,onEdit,onRemove,onBaixa,tipo}){
   const meioPagLabel={pix:"PIX",dinheiro:"Dinheiro",cheque:"Cheque",boleto:"Boleto",ted:"TED",cartao:"Cartão"};
   const getBaixaLabel=(item)=>{
     if(tipo==="receita") return item.recebido?"✓ Recebido":"Receber";
@@ -287,19 +287,14 @@ function ItemList({items,col,emptyMsg,onEdit,onRemove,onBaixa,tipo,selMode,selId
   return <div>
     {items.map(item=>{
       const confirmado=isConfirmado(item);
-      const checked=selMode&&selIds?.includes(item.id);
       return(
-        <div key={item.id} style={{...itemRow,flexWrap:"wrap",gap:"8px",background:checked?T.purpleLight:confirmado?T.greenLight:T.surfaceAlt,border:`1px solid ${checked?T.purple+"99":confirmado?T.green+"55":T.border}`,cursor:selMode?"pointer":"default"}} onClick={selMode?()=>onToggleSel(item.id):undefined}>
-          {selMode&&(
-            <span style={{flexShrink:0,width:"22px",height:"22px",borderRadius:"6px",border:`2px solid ${checked?T.purple:T.borderStrong}`,background:checked?T.purple:"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:"13px",fontWeight:800}}>{checked?"✓":""}</span>
-          )}
+        <div key={item.id} style={{...itemRow,flexWrap:"wrap",gap:"8px",background:confirmado?T.greenLight:T.surfaceAlt,border:`1px solid ${confirmado?T.green+"55":T.border}`}}>
           <div style={{flex:1,minWidth:"180px"}}>
             <div style={{display:"flex",alignItems:"center",gap:"6px",flexWrap:"wrap"}}>
               <p style={{color:confirmado?T.green:T.text,fontSize:"13px",fontWeight:600,margin:0,textDecoration:confirmado?"none":"none"}}>{item.desc}</p>
               {item.ref&&<span style={{...chip(T.purple),fontSize:"10px"}}>{item.ref}</span>}
               {confirmado&&<span style={{...chip(T.green),fontSize:"10px"}}>✓ {tipo==="receita"?"Recebido":tipo==="investimento"?"Aplicado":"Pago"}</span>}
               {item.recorrente&&<span style={{...chip(T.amber),fontSize:"10px"}}>🔁</span>}
-              {item.transportadaDe&&<span style={{...chip(T.amber),fontSize:"10px"}} title={"Transportada de "+item.transportadaDe}>➡️ {item.transportadaDe}</span>}
               {item.dataBaixa&&<span style={{fontSize:"10px",color:T.green}}>em {item.dataBaixa}</span>}
             </div>
             <div style={{display:"flex",gap:"8px",marginTop:"3px",flexWrap:"wrap"}}>
@@ -309,12 +304,10 @@ function ItemList({items,col,emptyMsg,onEdit,onRemove,onBaixa,tipo,selMode,selId
               {item.parafem&&<span style={{color:T.textSub,fontSize:"11px"}}>↔ {item.parafem}</span>}
               {item.banco&&<span style={{color:T.textSub,fontSize:"11px"}}>🏦 {item.banco}</span>}
               {item.meioPag&&<span style={{color:T.blue,fontSize:"11px"}}>{meioPagLabel[item.meioPag]||item.meioPag}</span>}
-              {item.jurosMulta>0&&<span style={{color:T.red,fontSize:"11px",fontWeight:600}} title="Inclui juros/multa">+{fmt(item.jurosMulta)} juros</span>}
               {item.parcelaNum&&<span style={{color:T.amber,fontSize:"11px",fontWeight:600,background:"#FEF3C7",padding:"1px 6px",borderRadius:"4px"}}>Parcela {item.parcelaNum}/{item.parcelas} • {fmt(item.valorTotal||item.valor*item.parcelas)}</span>}
               {!item.parcelaNum&&item.parcelas>1&&<span style={{color:T.amber,fontSize:"11px"}}>{item.parcelas}x</span>}
             </div>
           </div>
-          {!selMode&&(
           <div style={{display:"flex",alignItems:"center",gap:"6px",flexWrap:"wrap"}}>
             <span style={{color:confirmado?T.green:col,fontWeight:700,fontSize:"14px"}}>{fmt(item.valor)}</span>
             <button
@@ -322,12 +315,9 @@ function ItemList({items,col,emptyMsg,onEdit,onRemove,onBaixa,tipo,selMode,selId
               onClick={()=>onBaixa(item.id)}>
               {getBaixaLabel(item)}
             </button>
-            {!confirmado&&onAdiar&&<button style={{background:T.amberLight,border:`1px solid ${T.amber}55`,color:T.amber,borderRadius:"6px",cursor:"pointer",padding:"4px 8px",fontSize:"11px",fontWeight:700,whiteSpace:"nowrap"}} title="Adiar p/ próximo mês" onClick={()=>onAdiar(item.id)}>➡️ Adiar</button>}
             <button style={editB} onClick={()=>onEdit(item)}>✏️</button>
             <button style={remB} onClick={()=>onRemove(item.id)}>✕</button>
           </div>
-          )}
-          {selMode&&<span style={{color:confirmado?T.green:col,fontWeight:700,fontSize:"14px"}}>{fmt(item.valor)}</span>}
         </div>
       );
     })}
@@ -953,10 +943,6 @@ export default function App(){
   };
   const [showModal, setShowModal] = useState(null); // tipo do modal
   const [editingItem, setEditingItem] = useState(null);
-  const [baixaModal, setBaixaModal] = useState(null);   // {tipo,id,desc,valor,date} — efetivar com juros/multa
-  const [selMode, setSelMode] = useState(false);        // modo seleção (edição em lote)
-  const [selIds, setSelIds] = useState([]);
-  const [batchModal, setBatchModal] = useState(null);   // 'mes' | 'categoria'
   const [recForm, setRecForm] = useState(emptyRecForm(today));
   const [despForm, setDespForm] = useState(emptyDespForm(today));
   const [invForm, setInvForm] = useState(emptyInvForm(today));
@@ -1511,110 +1497,9 @@ Cancelar = Dar baixa só nesta parcela`);
         }
       }
     }
-    // Já confirmado → desfaz a baixa e restaura valor original (remove juros/multa)
-    if(jaConfirmado){
-      setData(d=>d.map((m,i)=>i===currentMonth?{...m,[key]:m[key].map(x=>{
-        if(x.id!==id) return x;
-        const restored=x.valorOriginal!=null?x.valorOriginal:x.valor;
-        const {valorOriginal,jurosMulta,...rest}=x;
-        return {...rest,valor:restored,[statusField]:false,dataBaixa:null};
-      })}:m));
-      showToast("Baixa desfeita.");
-      return;
-    }
-    // Confirmar 1 item → abre modal pedindo data + juros/multa (opcional)
-    setBaixaModal({tipo,id,desc:targetItem?.desc||"",valor:targetItem?.valor||0,date:targetItem?.date||targetItem?.data||""});
+    setData(d=>d.map((m,i)=>i===currentMonth?{...m,[key]:m[key].map(x=>x.id===id?{...x,[statusField]:!x[statusField],dataBaixa:!x[statusField]?dataBaixa:null}:x)}:m));
+    showToast("Status atualizado!");
   };
-
-  // ── Efetivar com juros/multa: total pago = valor + juros (item #5) ──────────
-  const confirmBaixa=({juros,dataBaixa})=>{
-    if(!baixaModal) return;
-    const {tipo,id}=baixaModal;
-    const key=tipo==="receita"?"receitas":tipo==="despesa"?"despesas":tipo==="investimento"?"investimentos":"emprestimos";
-    const statusField=tipo==="receita"?"recebido":tipo==="investimento"?"investido":"pago";
-    const J=parseFloat(String(juros).replace(",","."))||0;
-    const db=dataBaixa||new Date().toISOString().split("T")[0];
-    setData(d=>d.map((m,i)=>i===currentMonth?{...m,[key]:m[key].map(x=>{
-      if(x.id!==id) return x;
-      const base=x.valorOriginal!=null?x.valorOriginal:x.valor;
-      return {...x,[statusField]:true,dataBaixa:db,
-        ...(J>0?{valorOriginal:base,jurosMulta:+( (x.jurosMulta||0)+J ).toFixed(2),valor:+(base+J).toFixed(2)}:{})};
-    })}:m));
-    setBaixaModal(null);
-    showToast(J>0?`✅ Efetivado · +${fmt(J)} de juros/multa`:"✅ Efetivado!");
-  };
-
-  // ── Adiar/transportar 1 provisão para o mês seguinte (item #5) ──────────────
-  const bumpDate=(dateStr,ny,nm)=>{
-    const d=dateStr?new Date(dateStr+"T12:00:00"):new Date();
-    const day=d.getDate(), last=new Date(ny,nm+1,0).getDate();
-    return `${ny}-${String(nm+1).padStart(2,"0")}-${String(Math.min(day,last)).padStart(2,"0")}`;
-  };
-  const moverItens=(tipo,ids,ny,nm)=>{
-    const key=tipo==="receita"?"receitas":tipo==="despesa"?"despesas":tipo==="investimento"?"investimentos":"emprestimos";
-    const idSet=new Set(ids);
-    setAllYearsData(all=>{
-      const cyk=String(currentYear);
-      const curYr=(Array.isArray(all[cyk])&&all[cyk].length===12)?all[cyk].map(m=>({...m,[key]:[...m[key]]})):emptyYear();
-      const movidos=curYr[currentMonth][key].filter(x=>idSet.has(x.id));
-      if(movidos.length===0) return all;
-      curYr[currentMonth][key]=curYr[currentMonth][key].filter(x=>!idSet.has(x.id));
-      const nyk=String(ny);
-      const nextYr=(nyk===cyk)?curYr:((Array.isArray(all[nyk])&&all[nyk].length===12)?all[nyk].map(m=>({...m,[key]:[...m[key]]})):emptyYear());
-      movidos.forEach(it=>nextYr[nm][key].push({...it,date:bumpDate(it.date||it.data,ny,nm),mesRecorrente:undefined,transportadaDe:it.transportadaDe||`${MONTHS[currentMonth]}/${currentYear}`}));
-      return {...all,[cyk]:curYr,[nyk]:nextYr};
-    });
-  };
-  const adiarItem=(tipo,id)=>{
-    let ny=currentYear,nm=currentMonth+1; if(nm>11){nm=0;ny++;}
-    moverItens(tipo,[id],ny,nm);
-    showToast(`➡️ Adiada para ${MONTHS[nm]}/${ny}`);
-  };
-  // Transportar TODAS as provisões vencidas (não efetivadas) deste mês p/ o seguinte
-  const transportarVencidas=()=>{
-    const todayStr=new Date().toISOString().split("T")[0];
-    let ny=currentYear,nm=currentMonth+1; if(nm>11){nm=0;ny++;}
-    let total=0;
-    [["receita","receitas","recebido"],["despesa","despesas","pago"],["investimento","investimentos","investido"]].forEach(([tipo,key,sf])=>{
-      const ids=(safeData[currentMonth][key]||[]).filter(x=>!x[sf]&&x.date&&x.date<todayStr).map(x=>x.id);
-      if(ids.length){ moverItens(tipo,ids,ny,nm); total+=ids.length; }
-    });
-    showToast(total?`➡️ ${total} provisõe(s) vencida(s) transportada(s) para ${MONTHS[nm]}/${ny}`:"Nenhuma provisão vencida para transportar","info");
-  };
-
-  // ── Edição em lote (item #2) ────────────────────────────────────────────────
-  const batchKey=(tipo)=>tipo==="receita"?"receitas":tipo==="despesa"?"despesas":tipo==="investimento"?"investimentos":"emprestimos";
-  const batchEfetivar=()=>{
-    const key=batchKey(lancTab); const sf=lancTab==="receita"?"recebido":lancTab==="investimento"?"investido":"pago";
-    const db=new Date().toISOString().split("T")[0]; const idSet=new Set(selIds);
-    setData(d=>d.map((m,i)=>i===currentMonth?{...m,[key]:m[key].map(x=>idSet.has(x.id)?{...x,[sf]:true,dataBaixa:db}:x)}:m));
-    showToast(`✅ ${selIds.length} item(ns) efetivado(s)`); clearSel();
-  };
-  const batchExcluir=()=>{
-    const key=batchKey(lancTab); const idSet=new Set(selIds);
-    if(!confirm(`Excluir ${selIds.length} lançamento(s) selecionado(s)?`)) return;
-    setData(d=>d.map((m,i)=>i===currentMonth?{...m,[key]:m[key].filter(x=>!idSet.has(x.id))}:m));
-    showToast(`🗑️ ${selIds.length} excluído(s)`); clearSel();
-  };
-  const batchMoverMes=(targetMonth)=>{
-    const tm=parseInt(targetMonth); if(isNaN(tm)) return;
-    moverItens(lancTab,selIds,currentYear,tm);
-    showToast(`➡️ ${selIds.length} movido(s) para ${MONTHS[tm]}`); setBatchModal(null); clearSel();
-  };
-  const batchCategoria=(cat)=>{
-    const key=batchKey(lancTab); const idSet=new Set(selIds);
-    setData(d=>d.map((m,i)=>i===currentMonth?{...m,[key]:m[key].map(x=>idSet.has(x.id)?{...x,categoria:cat}:x)}:m));
-    showToast(`🏷️ Categoria aplicada a ${selIds.length} item(ns)`); setBatchModal(null); clearSel();
-  };
-  const batchRecorrente=()=>{
-    const key=batchKey(lancTab); const idSet=new Set(selIds);
-    setData(d=>d.map((m,i)=>i===currentMonth?{...m,[key]:m[key].map(x=>idSet.has(x.id)?{...x,recorrente:true}:x)}:m));
-    showToast(`🔁 ${selIds.length} marcado(s) como recorrente`); clearSel();
-  };
-  const toggleSel=(id)=>setSelIds(s=>s.includes(id)?s.filter(x=>x!==id):[...s,id]);
-  const clearSel=()=>{ setSelIds([]); setSelMode(false); };
-  useEffect(()=>{ setSelIds([]); setSelMode(false); /* limpa seleção ao trocar de aba/mês */ // eslint-disable-next-line
-  },[lancTab,currentMonth,currentYear]);
 
   const startEdit=(item,tipo)=>setEditingItem({...item,tipo,editDesc:item.desc,editValor:String(item.valor),editDate:item.date||item.data,editRef:item.ref||"",editCliente:item.cliente||"",editFornecedor:item.fornecedor||"",editBanco:item.banco||""});
 
@@ -2151,16 +2036,9 @@ Cancelar = Dar baixa só nesta parcela`);
             {lancTabs.map(t=>(
               lancTab===t.key&&(
                 <div key={t.key} style={card()}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"14px",gap:"8px",flexWrap:"wrap"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"14px"}}>
                     <p style={{fontSize:"13px",fontWeight:700,color:t.col,margin:0}}>{t.label}</p>
-                    <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
-                      {(monthData[lancKey[t.key]]||[]).length>0&&(
-                        selMode
-                          ? <button style={{...btnO(T.purple),padding:"7px 13px"}} onClick={clearSel}>✕ Cancelar seleção</button>
-                          : <button style={{...btnO(T.purple),padding:"7px 13px"}} onClick={()=>{setSelMode(true);setSelIds([]);}}>☑️ Selecionar</button>
-                      )}
-                      <button style={btnP(t.col)} onClick={()=>setShowModal(t.key)}>+ Novo lançamento</button>
-                    </div>
+                    <button style={btnP(t.col)} onClick={()=>setShowModal(t.key)}>+ Novo lançamento</button>
                   </div>
                   <ItemList
                     items={monthData[lancKey[t.key]]||[]}
@@ -2169,21 +2047,7 @@ Cancelar = Dar baixa só nesta parcela`);
                     onEdit={(item)=>startEdit(item,t.key)}
                     onRemove={(id)=>removeItem(t.key,id)}
                     onBaixa={(id)=>toggleBaixa(t.key,id)}
-                    onAdiar={(id)=>adiarItem(t.key,id)}
-                    selMode={selMode} selIds={selIds} onToggleSel={toggleSel}
                   />
-                  {selMode&&selIds.length>0&&(
-                    <div style={{display:"flex",alignItems:"center",gap:"8px",flexWrap:"wrap",marginTop:"12px",padding:"12px",borderRadius:"12px",background:T.purpleLight,border:`1px solid ${T.purple}44`}}>
-                      <b style={{fontSize:"13px",color:T.purple}}>{selIds.length} selecionado(s)</b>
-                      <div style={{display:"flex",gap:"6px",flexWrap:"wrap",marginLeft:"auto"}}>
-                        <button style={{...btnP(T.green),padding:"7px 12px"}} onClick={batchEfetivar}>✓ Efetivar</button>
-                        <button style={{...btnO(T.blue),padding:"7px 12px"}} onClick={()=>setBatchModal("mes")}>📅 Mudar mês</button>
-                        <button style={{...btnO(T.purple),padding:"7px 12px"}} onClick={()=>setBatchModal("categoria")}>🏷️ Categoria</button>
-                        <button style={{...btnO(T.amber),padding:"7px 12px"}} onClick={batchRecorrente}>🔁 Recorrente</button>
-                        <button style={{...btnO(T.red),padding:"7px 12px"}} onClick={batchExcluir}>🗑️ Excluir</button>
-                      </div>
-                    </div>
-                  )}
                   <div style={{textAlign:"right",borderTop:`1px solid ${T.border}`,paddingTop:"8px",marginTop:"8px"}}>
                     <span style={{color:T.textSub,fontSize:"12px"}}>Total: </span>
                     <span style={{color:t.col,fontWeight:700,fontSize:"15px"}}>{fmt(sumArr(monthData[lancKey[t.key]]||[]))}</span>
@@ -2228,9 +2092,6 @@ Cancelar = Dar baixa só nesta parcela`);
                     </div>
                   ))}
                 </div>
-                {(()=>{ const todayS=new Date().toISOString().split("T")[0]; const venc=blocos.reduce((s,b)=>s+b.pendentes.filter(x=>x.date&&x.date<todayS).length,0); return venc>0?(
-                  <button onClick={transportarVencidas} style={{marginTop:"16px",padding:"9px 16px",borderRadius:"10px",border:"1px solid rgba(255,255,255,.35)",background:"rgba(255,255,255,.14)",color:"#fff",fontWeight:600,fontSize:"12.5px",cursor:"pointer",backdropFilter:"blur(4px)"}}>➡️ Transportar {venc} vencida(s) para {MONTHS[(currentMonth+1)%12]}</button>
-                ):null; })()}
               </div>
             </div>
 
@@ -2279,7 +2140,6 @@ Cancelar = Dar baixa só nesta parcela`);
                       </div>
                     </div>
                     <span style={{fontSize:"14.5px",fontWeight:700,color:b.c,fontFamily:"'Sora',sans-serif",whiteSpace:"nowrap"}}>{fmt(it.valor)}</span>
-                    <button onClick={()=>adiarItem(b.tipo,it.id)} title="Adiar para o próximo mês" style={{flexShrink:0,padding:"7px 11px",borderRadius:"9px",border:`1px solid ${T.amber}55`,cursor:"pointer",background:T.amberLight,color:T.amber,fontWeight:600,fontSize:"12px"}}>➡️ Adiar</button>
                     <button onClick={()=>toggleBaixa(b.tipo,it.id)} style={{flexShrink:0,padding:"7px 13px",borderRadius:"9px",border:"none",cursor:"pointer",background:b.c,color:"#fff",fontWeight:600,fontSize:"12.5px",boxShadow:`0 4px 10px -4px ${b.c}99`}}>{b.verbo}</button>
                   </div>
                   );
@@ -3987,62 +3847,6 @@ Cancelar = Dar baixa só nesta parcela`);
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 3v4M3 5h4M6 17v4M4 19h4M13 3l2.5 6.5L22 12l-6.5 2.5L13 21l-2.5-6.5L4 12l6.5-2.5L13 3Z"/></svg>
         Lançar
       </button>
-
-      {/* MODAL EFETIVAR (com juros/multa) */}
-      {baixaModal&&(()=>{
-        const isRec=baixaModal.tipo==="receita";
-        const verbo=isRec?"Recebido":baixaModal.tipo==="investimento"?"Investido":"Pago";
-        return (
-        <div style={{position:"fixed",inset:0,zIndex:600,background:"rgba(0,0,0,0.45)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}} onClick={()=>setBaixaModal(null)}>
-          <div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:"16px",padding:"22px",width:"420px",maxWidth:"96vw",boxShadow:shadowMd}} onClick={e=>e.stopPropagation()}>
-            <h3 style={{color:T.text,margin:"0 0 4px",fontSize:"16px"}}>✓ Efetivar lançamento</h3>
-            <p style={{color:T.textSub,fontSize:"13px",margin:"0 0 16px"}}>{baixaModal.desc} · <b style={{color:T.text}}>{fmt(baixaModal.valor)}</b></p>
-            <div style={{display:"flex",flexDirection:"column",gap:"12px"}}>
-              <div><label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Data em que foi {verbo.toLowerCase()}</label>
-                <input type="date" style={inpDate} value={baixaModal.dataBaixa||today} onChange={e=>setBaixaModal(b=>({...b,dataBaixa:e.target.value}))}/></div>
-              <div><label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>{isRec?"Juros / acréscimo recebido":"Juros / multa pagos"} (opcional)</label>
-                <input type="number" step="0.01" placeholder="0,00" style={inpS} value={baixaModal.juros||""} onChange={e=>setBaixaModal(b=>({...b,juros:e.target.value}))}/></div>
-              {parseFloat(String(baixaModal.juros||"").replace(",","."))>0&&(
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 12px",borderRadius:"10px",background:T.surfaceAlt,border:`1px solid ${T.border}`}}>
-                  <span style={{fontSize:"12.5px",color:T.textSub}}>Total {isRec?"recebido":"pago"}</span>
-                  <b style={{fontSize:"16px",color:isRec?T.green:T.red}}>{fmt((baixaModal.valor||0)+(parseFloat(String(baixaModal.juros).replace(",","."))||0))}</b>
-                </div>
-              )}
-            </div>
-            <div style={{display:"flex",gap:"8px",marginTop:"18px",justifyContent:"flex-end"}}>
-              <button style={btnG} onClick={()=>setBaixaModal(null)}>Cancelar</button>
-              <button style={btnP(T.green)} onClick={()=>confirmBaixa({juros:baixaModal.juros,dataBaixa:baixaModal.dataBaixa||today})}>Confirmar — {verbo.toLowerCase()}</button>
-            </div>
-          </div>
-        </div>
-        );
-      })()}
-
-      {/* MODAL EDIÇÃO EM LOTE (mês / categoria) */}
-      {batchModal&&(
-        <div style={{position:"fixed",inset:0,zIndex:600,background:"rgba(0,0,0,0.45)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}} onClick={()=>setBatchModal(null)}>
-          <div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:"16px",padding:"22px",width:"420px",maxWidth:"96vw",boxShadow:shadowMd}} onClick={e=>e.stopPropagation()}>
-            <h3 style={{color:T.text,margin:"0 0 4px",fontSize:"16px"}}>{batchModal==="mes"?"📅 Mover para o mês":"🏷️ Mudar categoria"}</h3>
-            <p style={{color:T.textSub,fontSize:"13px",margin:"0 0 16px"}}>{selIds.length} item(ns) selecionado(s)</p>
-            {batchModal==="mes"?(
-              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"8px"}}>
-                {MONTHS.map((m,i)=>(
-                  <button key={i} disabled={i===currentMonth} style={{padding:"10px",borderRadius:"10px",border:`1px solid ${i===currentMonth?T.border:T.borderStrong}`,background:i===currentMonth?T.surfaceAlt:T.surface,color:i===currentMonth?T.textMuted:T.text,fontSize:"12.5px",fontWeight:600,cursor:i===currentMonth?"default":"pointer",opacity:i===currentMonth?.5:1}} onClick={()=>batchMoverMes(i)}>{m.slice(0,3)}</button>
-                ))}
-              </div>
-            ):(
-              <div style={{display:"flex",flexDirection:"column",gap:"6px",maxHeight:"320px",overflowY:"auto"}}>
-                {(()=>{ const ck=lancTab==="receita"?"catReceitas":lancTab==="investimento"?"catInvestimentos":"catDespesas"; const cats=cadastros[ck]||[]; return cats.length?cats.map(c=>(
-                  <button key={c.id} style={{padding:"11px 13px",borderRadius:"10px",border:`1px solid ${T.border}`,background:T.surfaceAlt,color:T.text,fontSize:"13px",fontWeight:500,cursor:"pointer",textAlign:"left"}} onClick={()=>batchCategoria(c.nome)}>{c.nome}</button>
-                )):<p style={{color:T.textMuted,fontSize:"13px",textAlign:"center",padding:"16px 0"}}>Nenhuma categoria cadastrada. Cadastre em Cadastros → Categorias.</p>; })()}
-              </div>
-            )}
-            <div style={{display:"flex",gap:"8px",marginTop:"18px",justifyContent:"flex-end"}}>
-              <button style={btnG} onClick={()=>setBatchModal(null)}>Fechar</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* MODAL EDIÇÃO */}
       {editingItem&&(

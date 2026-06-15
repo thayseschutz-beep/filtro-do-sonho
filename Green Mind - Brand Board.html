@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Green Mind — Brand Board</title>
+<link rel="stylesheet" href="assets/brand.css" />
+<style>
+  html, body { margin: 0; }
+  .bb { font-family: var(--gm-display); color: var(--gm-ink); }
+  .panel { background: #fff; border-radius: 22px; box-shadow: var(--gm-shadow); overflow: hidden; }
+  .pad { padding: 30px; }
+  .cap { font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--gm-green-600); margin: 0 0 4px; }
+  .sub { font-family: var(--gm-ui); font-size: 13px; color: var(--gm-slate); margin: 0; }
+
+  /* logo lockups */
+  .lock { display: flex; align-items: center; gap: 16px; }
+  .lock img { width: 64px; height: 64px; }
+  .lock .gm-wordmark { font-size: 40px; }
+  .tagrow { font-family: var(--gm-ui); font-size: 13px; color: var(--gm-slate); margin-top: 8px; letter-spacing: .02em; }
+  .on-dark-panel { background: var(--gm-grad-dark); }
+  .on-dark-panel .tagrow { color: rgba(255,255,255,.65); }
+  .on-mint-panel { background: var(--gm-mint-2); }
+
+  /* app icons */
+  .icon-row { display: flex; gap: 22px; align-items: flex-end; flex-wrap: wrap; }
+  .appicon { width: 120px; height: 120px; border-radius: 27px; display: grid; place-items: center; box-shadow: 0 18px 30px -12px rgba(15,36,25,.4); position: relative; overflow: hidden; }
+  .appicon.sm { width: 64px; height: 64px; border-radius: 15px; }
+  .appicon img { width: 72%; height: 72%; object-fit: contain; }
+  .appicon.white-mark img { filter: brightness(0) invert(1); }
+  .appicon-grad { background: var(--gm-grad-dark); }
+  .appicon-lime { background: linear-gradient(145deg,#4ADE80,#16A34A); }
+  .appicon-paper { background: #fff; border: 1px solid var(--gm-line); }
+  .icon-cap { font-family: var(--gm-ui); font-size: 11px; color: var(--gm-slate); text-align: center; margin-top: 8px; }
+
+  /* palette */
+  .swatches { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+  .swatch { border-radius: 16px; overflow: hidden; border: 1px solid var(--gm-line); }
+  .swatch .chip { height: 88px; }
+  .swatch .meta { padding: 10px 12px; }
+  .swatch .name { font-family: var(--gm-ui); font-size: 12.5px; font-weight: 600; }
+  .swatch .hex { font-family: var(--gm-num); font-size: 11px; color: var(--gm-slate); text-transform: uppercase; }
+
+  /* type */
+  .type-spec { display: flex; flex-direction: column; gap: 22px; }
+  .type-row .t-meta { font-family: var(--gm-ui); font-size: 12px; color: var(--gm-slate); margin-bottom: 4px; }
+  .display-xl { font-family: var(--gm-display); font-weight: 700; font-size: 52px; letter-spacing: -.025em; line-height: 1; }
+  .display-l { font-family: var(--gm-display); font-weight: 600; font-size: 30px; letter-spacing: -.02em; }
+  .body-t { font-family: var(--gm-ui); font-weight: 400; font-size: 17px; color: var(--gm-ink); line-height: 1.5; max-width: 460px; }
+  .num-t { font-family: var(--gm-num); font-weight: 700; font-size: 40px; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+  .glyphset { font-family: var(--gm-ui); font-size: 14px; color: var(--gm-slate); letter-spacing: .04em; }
+
+  /* principles */
+  .princ { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .princ .p { background: var(--gm-mint-2); border-radius: 16px; padding: 18px; }
+  .princ .p b { font-family: var(--gm-display); font-size: 16px; }
+  .princ .p p { font-family: var(--gm-ui); font-size: 13px; color: var(--gm-slate); line-height: 1.45; margin: 6px 0 0; }
+  .voice { font-family: var(--gm-ui); }
+  .voice .do, .voice .dont { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; margin-bottom: 9px; }
+  .voice .mk { width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; flex: none; font-weight: 700; color: #fff; font-family: var(--gm-num); }
+  .voice .do .mk { background: var(--gm-green); }
+  .voice .dont .mk { background: var(--gm-coral); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="lib/design-canvas.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+const PALETTE = [
+  { name: 'Ink', hex: '#0F2419', dark: 1 },
+  { name: 'Forest', hex: '#166534', dark: 1 },
+  { name: 'Green', hex: '#22C55E' },
+  { name: 'Lime', hex: '#4ADE80' },
+  { name: 'Mint', hex: '#DCFCE7' },
+  { name: 'Cloud', hex: '#F1F5F9' },
+  { name: 'Slate', hex: '#64748B', dark: 1 },
+  { name: 'Âmbar', hex: '#F59E0B' },
+  { name: 'Coral', hex: '#EF4444', dark: 1 },
+  { name: 'Azul', hex: '#3B82F6', dark: 1 },
+];
+
+function Brand() {
+  return (
+    <DesignCanvas>
+      <DCSection id="logo" title="Logotipo" subtitle="A marca: cérebro + gráfico de crescimento. Wordmark redesenhado em Poppins para contraste.">
+        <DCArtboard id="l-light" label="Principal · claro" width={520} height={300}>
+          <div className="bb panel pad" style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <p className="cap">Lockup horizontal</p>
+            <div className="lock">
+              <img src="assets/logo-mark.png" alt="GreenMind" />
+              <div>
+                <div className="gm-wordmark"><span className="g">Green</span><span className="m">Mind</span></div>
+                <div className="tagrow">Dinheiro que cresce com clareza</div>
+              </div>
+            </div>
+          </div>
+        </DCArtboard>
+        <DCArtboard id="l-dark" label="Principal · escuro" width={520} height={300}>
+          <div className="bb panel on-dark-panel pad" style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <p className="cap" style={{ color: '#86efac' }}>Lockup horizontal</p>
+            <div className="lock">
+              <img src="assets/logo-mark.png" alt="GreenMind" />
+              <div>
+                <div className="gm-wordmark on-dark"><span className="g">Green</span><span className="m">Mind</span></div>
+                <div className="tagrow">Dinheiro que cresce com clareza</div>
+              </div>
+            </div>
+          </div>
+        </DCArtboard>
+        <DCArtboard id="l-stack" label="Empilhado" width={300} height={300}>
+          <div className="bb panel on-mint-panel pad" style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
+            <img src="assets/logo-mark.png" alt="GreenMind" style={{ width: 96, height: 96 }} />
+            <div className="gm-wordmark" style={{ fontSize: 30 }}><span className="g">Green</span><span className="m">Mind</span></div>
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="icon" title="App icon" subtitle="Ícone do app em variações de fundo. Cantos arredondados estilo iOS (squircle).">
+        <DCArtboard id="icons" label="Variações" width={620} height={260}>
+          <div className="bb panel pad" style={{ height: '100%', display: 'flex', alignItems: 'center' }}>
+            <div className="icon-row">
+              <div>
+                <div className="appicon appicon-grad white-mark"><img src="assets/logo-mark.png" alt="" /></div>
+                <div className="icon-cap">Escuro (padrão)</div>
+              </div>
+              <div>
+                <div className="appicon appicon-lime white-mark"><img src="assets/logo-mark.png" alt="" /></div>
+                <div className="icon-cap">Lima</div>
+              </div>
+              <div>
+                <div className="appicon appicon-paper"><img src="assets/logo-mark.png" alt="" /></div>
+                <div className="icon-cap">Claro</div>
+              </div>
+              <div>
+                <div className="appicon appicon-grad white-mark sm"><img src="assets/logo-mark.png" alt="" /></div>
+                <div className="icon-cap">Pequeno</div>
+              </div>
+            </div>
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="color" title="Paleta" subtitle="Verdes de crescimento + neutros calmos. Coral/âmbar/azul para estados funcionais.">
+        <DCArtboard id="pal" label="Cores da marca" width={620} height={320}>
+          <div className="bb panel pad" style={{ height: '100%' }}>
+            <div className="swatches">
+              {PALETTE.map(c => (
+                <div className="swatch" key={c.name}>
+                  <div className="chip" style={{ background: c.hex }}></div>
+                  <div className="meta"><div className="name">{c.name}</div><div className="hex">{c.hex}</div></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </DCArtboard>
+        <DCArtboard id="grad" label="Gradiente" width={300} height={320}>
+          <div className="bb panel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ flex: 1, background: 'var(--gm-grad)' }}></div>
+            <div style={{ flex: 1, background: 'var(--gm-grad-dark)' }}></div>
+            <div className="pad" style={{ flex: 'none' }}><p className="cap">Brand gradient</p><p className="sub">Lima → Verde → Forest · usado em destaques e no saldo.</p></div>
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="type" title="Tipografia" subtitle="Poppins para tudo na interface; Sora com tabular-nums para valores monetários.">
+        <DCArtboard id="type-a" label="Escala" width={560} height={440}>
+          <div className="bb panel pad" style={{ height: '100%' }}>
+            <div className="type-spec">
+              <div className="type-row">
+                <div className="t-meta">Poppins · 700 · Display</div>
+                <div className="display-xl">Cresça com<br/>clareza.</div>
+              </div>
+              <div className="type-row">
+                <div className="t-meta">Poppins · 600 · Título</div>
+                <div className="display-l">Seu dinheiro, sem planilha</div>
+              </div>
+              <div className="type-row">
+                <div className="t-meta">Poppins · 400 · Corpo</div>
+                <div className="body-t">Acompanhe receitas, despesas e a regra 50/30/20 em tempo real — e veja seus sonhos saírem do papel.</div>
+              </div>
+            </div>
+          </div>
+        </DCArtboard>
+        <DCArtboard id="type-b" label="Números" width={360} height={440}>
+          <div className="bb panel pad" style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div>
+              <div className="t-meta" style={{ fontFamily: 'var(--gm-ui)', fontSize: 12, color: 'var(--gm-slate)', marginBottom: 6 }}>Sora · 700 · tabular-nums</div>
+              <div className="num-t" style={{ color: 'var(--gm-green-600)' }}>R$ 13.612,30</div>
+              <div className="num-t" style={{ color: 'var(--gm-coral)', marginTop: 8 }}>− R$ 6.007,50</div>
+              <div className="num-t" style={{ color: 'var(--gm-ink)', marginTop: 8 }}>56%</div>
+            </div>
+            <div>
+              <div className="t-meta" style={{ fontFamily: 'var(--gm-ui)', fontSize: 12, color: 'var(--gm-slate)', marginBottom: 6 }}>Glifos</div>
+              <div className="glyphset gm-num">0 1 2 3 4 5 6 7 8 9 R$ % + −</div>
+            </div>
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="voice" title="Princípios & voz" subtitle="Como a marca se comporta e fala com o usuário.">
+        <DCArtboard id="pr" label="Princípios" width={460} height={300}>
+          <div className="bb panel pad" style={{ height: '100%' }}>
+            <div className="princ">
+              <div className="p"><b>Clareza primeiro</b><p>Números grandes, hierarquia óbvia. Nunca esconder a verdade financeira.</p></div>
+              <div className="p"><b>Crescimento calmo</b><p>Verde que tranquiliza. Progresso sem ansiedade nem culpa.</p></div>
+              <div className="p"><b>Para todos</b><p>Linguagem simples, sem jargão de banco. Toda idade entende.</p></div>
+              <div className="p"><b>Sonho no centro</b><p>Cada real conectado a um objetivo real e pessoal.</p></div>
+            </div>
+          </div>
+        </DCArtboard>
+        <DCArtboard id="vo" label="Tom de voz" width={420} height={300}>
+          <div className="bb panel pad voice" style={{ height: '100%' }}>
+            <p className="cap">Tom de voz</p>
+            <div style={{ marginTop: 14 }}>
+              <div className="do"><span className="mk">✓</span><span>"Você guardou R$ 1.200 esse mês. Tá no caminho do seu sonho!"</span></div>
+              <div className="do"><span className="mk">✓</span><span>"Seus gastos essenciais passaram de 50%. Bora ajustar?"</span></div>
+              <div className="dont"><span className="mk">✕</span><span>"Índice de liquidez corrente abaixo do benchmark setorial."</span></div>
+              <div className="dont"><span className="mk">✕</span><span>"Você falhou na sua meta de poupança novamente."</span></div>
+            </div>
+          </div>
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<Brand />);
+</script>
+</body>
+</html>

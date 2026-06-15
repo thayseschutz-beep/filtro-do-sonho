@@ -1,0 +1,62 @@
+/* ============================================================
+   GREEN MIND — Brand tokens
+   Personal finance app · pt-BR · "Dinheiro que cresce com clareza"
+   Palette + type adopted from the official GreenMind identity.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,500&family=Sora:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Core brand greens */
+  --gm-ink:      #0F2419;  /* near-black forest — text, dark surfaces */
+  --gm-forest:   #166534;  /* deep brand green */
+  --gm-green:    #22C55E;  /* primary / action green */
+  --gm-green-600:#16A34A;
+  --gm-lime:     #4ADE80;  /* bright highlight */
+  --gm-mint:     #DCFCE7;  /* soft tint surface */
+  --gm-mint-2:   #ECFDF3;
+
+  /* Neutrals */
+  --gm-cloud:    #F1F5F9;  /* app background */
+  --gm-paper:    #FFFFFF;
+  --gm-line:     #E6EBE8;  /* hairline borders */
+  --gm-slate:    #64748B;  /* muted text */
+  --gm-slate-2:  #94A3B8;
+
+  /* Functional accents */
+  --gm-amber:    #F59E0B;  /* faturas / pending / attention */
+  --gm-amber-bg: #FEF3C7;
+  --gm-coral:    #EF4444;  /* despesas / negative */
+  --gm-coral-bg: #FEE2E2;
+  --gm-blue:     #3B82F6;  /* investimentos */
+  --gm-violet:   #8B5CF6;  /* empréstimos */
+
+  /* Brand gradient (from the logo mark) */
+  --gm-grad:     linear-gradient(140deg, #4ADE80 0%, #22C55E 42%, #166534 100%);
+  --gm-grad-dark:linear-gradient(160deg, #166534 0%, #0F2419 100%);
+
+  /* Type */
+  --gm-display: 'Poppins', system-ui, sans-serif;
+  --gm-ui:      'Poppins', system-ui, sans-serif;
+  --gm-num:     'Sora', 'Poppins', system-ui, sans-serif; /* tabular money figures */
+
+  /* Radii + shadow */
+  --gm-r-sm: 12px;
+  --gm-r:    18px;
+  --gm-r-lg: 26px;
+  --gm-r-xl: 34px;
+  --gm-shadow:    0 12px 32px -12px rgba(15,36,25,.22);
+  --gm-shadow-sm: 0 4px 14px -6px rgba(15,36,25,.18);
+  --gm-shadow-lg: 0 30px 70px -28px rgba(15,36,25,.40);
+}
+
+* { box-sizing: border-box; }
+
+.gm-num { font-family: var(--gm-num); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+
+/* Typeset wordmark (legible alternative to the pale lockup PNG) */
+.gm-wordmark { font-family: var(--gm-display); font-weight: 700; letter-spacing: -.02em; line-height: 1; white-space: nowrap; }
+.gm-wordmark .g { color: var(--gm-green); margin-right: .22em; }
+.gm-wordmark .m { color: var(--gm-ink); }
+.gm-wordmark.on-dark .m { color: #fff; }
+.gm-wordmark.on-dark .g { color: var(--gm-lime); }

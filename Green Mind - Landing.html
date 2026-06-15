@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Green Mind — Dinheiro que cresce com clareza</title>
+<link rel="stylesheet" href="assets/brand.css" />
+<style>
+  html { scroll-behavior: smooth; }
+  body { margin: 0; font-family: var(--gm-ui); color: var(--gm-ink); background: var(--gm-paper); -webkit-font-smoothing: antialiased; overflow-x: hidden; transition: background .3s, color .3s; }
+
+  /* ===== DARK THEME ===== */
+  :root[data-theme="dark"] {
+    --gm-cloud: #0C1511; --gm-paper: #101B15; --gm-line: rgba(255,255,255,.10);
+    --gm-ink: #E8F1EC; --gm-slate: #9DB1A6; --gm-slate-2: #6E847A;
+    --gm-mint: #182C20; --gm-mint-2: #10201A;
+  }
+  :root[data-theme="dark"] nav { background: rgba(11,20,16,.82); }
+  :root[data-theme="dark"] .pill { color: #86efac; }
+  :root[data-theme="dark"] .feat:hover { box-shadow: 0 20px 50px -24px rgba(0,0,0,.7); }
+  .theme-toggle { width: 42px; height: 42px; border-radius: 13px; border: 1px solid var(--gm-line); background: transparent; color: var(--gm-ink); display: grid; place-items: center; cursor: pointer; transition: background .2s; flex: none; }
+  .theme-toggle:hover { background: var(--gm-cloud); }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 32px; }
+  a { color: inherit; text-decoration: none; }
+  h1, h2, h3 { font-family: var(--gm-display); letter-spacing: -.025em; margin: 0; }
+  .num { font-family: var(--gm-num); font-variant-numeric: tabular-nums; }
+
+  /* NAV */
+  nav { position: sticky; top: 0; z-index: 100; backdrop-filter: blur(12px); background: rgba(255,255,255,.82); border-bottom: 1px solid var(--gm-line); }
+  .nav-in { display: flex; align-items: center; justify-content: space-between; height: 70px; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand img { width: 38px; height: 38px; }
+  .brand .gm-wordmark { font-size: 22px; }
+  .nav-links { display: flex; align-items: center; gap: 30px; font-size: 14.5px; font-weight: 500; color: var(--gm-slate); }
+  .nav-links a:hover { color: var(--gm-ink); }
+  .nav-cta { display: flex; align-items: center; gap: 14px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; font-family: var(--gm-ui); font-weight: 600; font-size: 15px; border-radius: 14px; padding: 12px 22px; cursor: pointer; border: 0; transition: transform .15s, box-shadow .2s, background .2s; }
+  .btn-primary { background: var(--gm-grad); color: #fff; box-shadow: 0 12px 26px -12px rgba(34,197,94,.8); }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 18px 32px -12px rgba(34,197,94,.9); }
+  .btn-ghost { background: transparent; color: var(--gm-ink); }
+  .btn-ghost:hover { background: var(--gm-cloud); }
+  .btn-dark { background: var(--gm-ink); color: #fff; }
+  .btn-lg { padding: 16px 28px; font-size: 16px; border-radius: 16px; }
+
+  /* HERO */
+  .hero { position: relative; padding: 80px 0 90px; overflow: hidden; }
+  .hero::before { content: ''; position: absolute; top: -300px; right: -200px; width: 760px; height: 760px; border-radius: 50%; background: radial-gradient(circle, rgba(74,222,128,.20), transparent 65%); z-index: 0; }
+  .hero-in { position: relative; z-index: 1; display: grid; grid-template-columns: 1.05fr .95fr; gap: 50px; align-items: center; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; background: var(--gm-mint); color: var(--gm-forest); font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 999px; margin-bottom: 22px; }
+  .pill i { width: 7px; height: 7px; border-radius: 50%; background: var(--gm-green); }
+  .hero h1 { font-size: 60px; font-weight: 700; line-height: 1.02; }
+  .hero h1 .accent { color: var(--gm-green-600); }
+  .hero p.lead { font-size: 19px; line-height: 1.55; color: var(--gm-slate); margin: 22px 0 32px; max-width: 480px; }
+  .hero-actions { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  .stores { display: flex; gap: 16px; margin-top: 34px; align-items: center; color: var(--gm-slate); font-size: 13px; }
+  .stores .rate { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--gm-ink); }
+  .stars { color: var(--gm-amber); letter-spacing: 2px; }
+
+  /* phone in hero */
+  .hero-phone { justify-self: center; position: relative; }
+  .device { width: 320px; height: 668px; border-radius: 46px; background: #0F2419; padding: 6px; box-shadow: var(--gm-shadow-lg); }
+  .device-screen { width: 100%; height: 100%; border-radius: 40px; background: var(--gm-cloud); overflow: hidden; padding: 16px 14px; display: flex; flex-direction: column; gap: 12px; }
+  .ds-status { display: flex; justify-content: space-between; font-size: 11px; color: var(--gm-ink); padding: 2px 6px 4px; }
+  .ds-hero { background: var(--gm-grad-dark); border-radius: 22px; padding: 16px; color: #fff; }
+  .ds-hero-top { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: rgba(255,255,255,.72); }
+  .ds-rate { background: rgba(74,222,128,.22); color: #bbf7d0; font-size: 10.5px; font-weight: 600; padding: 3px 8px; border-radius: 8px; }
+  .ds-amount { font-size: 30px; font-weight: 700; letter-spacing: -.02em; margin: 8px 0 14px; }
+  .ds-chips { display: flex; gap: 8px; }
+  .ds-chip { flex: 1; background: rgba(255,255,255,.10); border-radius: 12px; padding: 8px 10px; }
+  .ds-chip small { display: block; font-size: 10px; color: rgba(255,255,255,.7); }
+  .ds-chip b { font-size: 13px; }
+  .ds-card { background: var(--gm-paper); border: 1px solid var(--gm-line); border-radius: 18px; padding: 14px; }
+  .ds-card.ds-flush { padding: 0; overflow: hidden; }
+  .ds-card-h { font-size: 10px; font-weight: 700; letter-spacing: .12em; color: var(--gm-green-600); margin-bottom: 12px; }
+  .ds-alloc { display: flex; flex-direction: column; gap: 11px; }
+  .ds-arow { display: flex; align-items: center; gap: 8px; }
+  .ds-dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+  .ds-lab { font-size: 12px; width: 64px; flex: none; }
+  .ds-bar { flex: 1; height: 8px; border-radius: 5px; background: var(--gm-cloud); overflow: hidden; }
+  .ds-bar i { display: block; height: 100%; border-radius: 5px; }
+  .ds-tx { display: flex; align-items: center; gap: 11px; padding: 12px 14px; border-top: 1px solid var(--gm-line); }
+  .ds-tx:first-child { border-top: 0; }
+  .ds-tx-ic { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; font-size: 18px; flex: none; }
+  .ds-tx-m { flex: 1; }
+  .ds-tx-m b { display: block; font-size: 13px; font-weight: 600; }
+  .ds-tx-m span { font-size: 11px; color: var(--gm-slate); }
+  .ds-tx-a { font-size: 13px; font-weight: 600; }
+  .ds-tx-a.pos { color: var(--gm-green-600); }
+  .ds-tx-a.neg { color: var(--gm-coral); }
+  .float-card { position: absolute; background: var(--gm-paper); border-radius: 16px; box-shadow: var(--gm-shadow); padding: 13px 15px; display: flex; align-items: center; gap: 11px; }
+  .float-card .fc-ic { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; flex: none; }
+  .float-card small { display: block; font-size: 11px; color: var(--gm-slate); }
+  .float-card b { font-size: 15px; }
+  .fc-1 { top: 360px; left: -56px; animation: bob 5s ease-in-out infinite; }
+  .fc-2 { bottom: 120px; right: -64px; animation: bob 5.6s ease-in-out infinite .5s; }
+  @keyframes bob { 50% { transform: translateY(-12px); } }
+  @media (prefers-reduced-motion: reduce) { .fc-1, .fc-2 { animation: none; } }
+
+  /* LOGOS / trust */
+  .trust { border-top: 1px solid var(--gm-line); border-bottom: 1px solid var(--gm-line); background: var(--gm-cloud); }
+  .trust-in { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; padding: 38px 0; }
+  .stat { text-align: center; }
+  .stat .big { font-family: var(--gm-num); font-size: 38px; font-weight: 700; color: var(--gm-forest); letter-spacing: -.02em; }
+  .stat .lbl { font-size: 13.5px; color: var(--gm-slate); margin-top: 4px; }
+
+  /* SECTION */
+  section.block { padding: 96px 0; }
+  .sec-head { text-align: center; max-width: 640px; margin: 0 auto 56px; }
+  .eyebrow2 { font-size: 12.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--gm-green-600); }
+  .sec-head h2 { font-size: 42px; font-weight: 700; margin: 12px 0 14px; }
+  .sec-head p { font-size: 18px; color: var(--gm-slate); line-height: 1.5; margin: 0; }
+
+  /* feature grid */
+  .feat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+  .feat { background: var(--gm-paper); border: 1px solid var(--gm-line); border-radius: 24px; padding: 30px; transition: transform .2s, box-shadow .2s, border-color .2s; }
+  .feat:hover { transform: translateY(-4px); box-shadow: var(--gm-shadow); border-color: transparent; }
+  .feat .f-ic { width: 54px; height: 54px; border-radius: 16px; display: grid; place-items: center; margin-bottom: 18px; }
+  .feat h3 { font-size: 21px; font-weight: 600; margin-bottom: 8px; }
+  .feat p { font-size: 15px; color: var(--gm-slate); line-height: 1.5; margin: 0; }
+  .feat.span2 { grid-column: span 2; }
+
+  /* 50/30/20 showcase */
+  .showcase { background: var(--gm-grad-dark); color: #fff; border-radius: 36px; overflow: hidden; position: relative; }
+  .showcase::before { content: ''; position: absolute; top: -120px; left: -80px; width: 420px; height: 420px; border-radius: 50%; background: radial-gradient(circle, rgba(34,197,94,.35), transparent 65%); }
+  .showcase-in { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 50px; align-items: center; padding: 60px; }
+  .showcase h2 { font-size: 38px; color: #fff; margin-bottom: 16px; }
+  .showcase p { font-size: 17px; color: rgba(255,255,255,.78); line-height: 1.55; margin: 0 0 26px; }
+  .alloc-demo { background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12); border-radius: 24px; padding: 28px; backdrop-filter: blur(6px); }
+  .ad-row { margin-bottom: 22px; }
+  .ad-row:last-child { margin-bottom: 0; }
+  .ad-top { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 9px; }
+  .ad-top .lab { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+  .ad-top .lab i { width: 10px; height: 10px; border-radius: 3px; }
+  .ad-top .lab small { color: rgba(255,255,255,.5); font-weight: 500; }
+  .ad-val { font-family: var(--gm-num); font-weight: 600; }
+  .ad-bar { height: 11px; border-radius: 7px; background: rgba(255,255,255,.12); overflow: hidden; }
+  .ad-bar span { display: block; height: 100%; border-radius: 7px; }
+
+  /* dream / steps */
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; counter-reset: s; }
+  .step { position: relative; padding-top: 18px; }
+  .step .n { font-family: var(--gm-num); font-size: 15px; font-weight: 700; color: var(--gm-green); width: 38px; height: 38px; border-radius: 12px; background: var(--gm-mint); display: grid; place-items: center; margin-bottom: 16px; }
+  .step h3 { font-size: 20px; margin-bottom: 8px; }
+  .step p { color: var(--gm-slate); font-size: 15px; line-height: 1.5; margin: 0; }
+
+  /* PRICING */
+  .price-toggle { display: inline-flex; align-items: center; gap: 4px; background: var(--gm-cloud); border: 1px solid var(--gm-line); border-radius: 999px; padding: 5px; margin: 22px auto 0; }
+  .price-toggle button { border: 0; background: none; font-family: var(--gm-ui); font-weight: 600; font-size: 14.5px; color: var(--gm-slate); padding: 9px 20px; border-radius: 999px; cursor: pointer; transition: .2s; display: inline-flex; align-items: center; gap: 8px; }
+  .price-toggle button.on { background: var(--gm-paper); color: var(--gm-ink); box-shadow: var(--gm-shadow-sm); }
+  .price-toggle .save { font-size: 11px; font-weight: 700; color: var(--gm-green-600); background: var(--gm-mint); padding: 2px 7px; border-radius: 7px; }
+
+  .plan-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; align-items: stretch; margin-top: 46px; }
+  .plan { position: relative; background: var(--gm-paper); border: 1px solid var(--gm-line); border-radius: 26px; padding: 32px 28px; display: flex; flex-direction: column; transition: transform .2s, box-shadow .2s; }
+  .plan:hover { transform: translateY(-4px); box-shadow: var(--gm-shadow); }
+  .plan.feature { border: 0; background: var(--gm-grad-dark); color: #fff; box-shadow: var(--gm-shadow-lg); }
+  .plan-badge { position: absolute; top: -13px; left: 50%; transform: translateX(-50%); background: var(--gm-grad); color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 6px 14px; border-radius: 999px; box-shadow: 0 8px 18px -8px rgba(34,197,94,.8); white-space: nowrap; }
+  .plan-name { font-family: var(--gm-display); font-size: 19px; font-weight: 600; }
+  .plan-desc { font-size: 13.5px; color: var(--gm-slate); margin: 6px 0 20px; min-height: 38px; line-height: 1.4; }
+  .plan.feature .plan-desc { color: rgba(255,255,255,.75); }
+  .plan-price { display: flex; align-items: baseline; gap: 4px; }
+  .plan-price .cur { font-family: var(--gm-num); font-size: 18px; font-weight: 600; color: var(--gm-slate); }
+  .plan.feature .plan-price .cur { color: rgba(255,255,255,.7); }
+  .plan-price .val { font-family: var(--gm-num); font-size: 46px; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
+  .plan-price .per { font-size: 14px; color: var(--gm-slate); align-self: flex-end; margin-bottom: 8px; }
+  .plan.feature .plan-price .per { color: rgba(255,255,255,.7); }
+  .plan-billed { font-size: 12.5px; color: var(--gm-green-600); font-weight: 600; margin: 8px 0 0; min-height: 18px; }
+  .plan.feature .plan-billed { color: var(--gm-lime); }
+  .plan-feats { list-style: none; margin: 22px 0 26px; padding: 18px 0 0; border-top: 1px solid var(--gm-line); display: flex; flex-direction: column; gap: 12px; flex: 1; }
+  .plan.feature .plan-feats { border-top-color: rgba(255,255,255,.14); }
+  .plan-feats li { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; line-height: 1.4; }
+  .plan-feats li.lead { font-weight: 600; }
+  .plan-feats svg { flex: none; margin-top: 2px; color: var(--gm-green-600); }
+  .plan.feature .plan-feats svg { color: var(--gm-lime); }
+  .plan .btn { width: 100%; justify-content: center; }
+  .plan.feature .btn-primary { background: #fff; color: var(--gm-forest); box-shadow: 0 12px 26px -12px rgba(0,0,0,.4); }
+  .plan.feature .btn-primary:hover { box-shadow: 0 18px 32px -12px rgba(0,0,0,.5); }
+  .price-note { text-align: center; margin-top: 30px; font-size: 14px; color: var(--gm-slate); }
+  .price-note b { color: var(--gm-ink); font-weight: 600; }
+
+  /* CTA */
+  .cta { background: var(--gm-mint-2); }
+  .cta-in { text-align: center; padding: 90px 0; }
+  .cta h2 { font-size: 46px; font-weight: 700; margin-bottom: 16px; }
+  .cta p { font-size: 19px; color: var(--gm-slate); margin: 0 auto 32px; max-width: 520px; }
+
+  /* footer */
+  /* footer — fixed dark in BOTH themes (independent of --gm-ink) */
+  footer { background: #0A1611; color: rgba(255,255,255,.7); padding: 56px 0 38px; }
+  .foot-in { display: flex; justify-content: space-between; gap: 40px; flex-wrap: wrap; }
+  .foot-brand { max-width: 280px; }
+  .foot-brand .gm-wordmark { font-size: 22px; margin-bottom: 12px; }
+  .foot-brand p { font-size: 14px; line-height: 1.5; margin: 0; color: rgba(255,255,255,.55); }
+  .foot-cols { display: flex; gap: 60px; flex-wrap: wrap; }
+  .foot-col h4 { font-family: var(--gm-ui); font-size: 13px; font-weight: 600; color: #fff; margin: 0 0 14px; }
+  .foot-col a { display: block; font-size: 14px; margin-bottom: 10px; color: rgba(255,255,255,.6); }
+  .foot-col a:hover { color: #fff; }
+  .foot-bottom { border-top: 1px solid rgba(255,255,255,.1); margin-top: 44px; padding-top: 24px; font-size: 13px; color: rgba(255,255,255,.45); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+
+  @media (max-width: 920px) {
+    .hero-in, .showcase-in { grid-template-columns: 1fr; }
+    .hero h1 { font-size: 46px; }
+    .feat-grid, .steps, .trust-in, .plan-grid { grid-template-columns: 1fr 1fr; }
+    .plan.feature { grid-column: span 2; }
+    .nav-links { display: none; }
+    .hero-phone { margin-top: 30px; }
+    .feat.span2 { grid-column: span 1; }
+  }
+  @media (max-width: 560px) {
+    .feat-grid, .steps, .trust-in, .plan-grid { grid-template-columns: 1fr; }
+    .plan.feature { grid-column: span 1; }
+    .wrap { padding: 0 20px; }
+    .hero h1 { font-size: 38px; }
+    .sec-head h2, .cta h2 { font-size: 32px; }
+  }
+</style>
+</head>
+<body>
+
+<template id="__bundler_thumbnail">
+  <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" rx="22" fill="#0F2419"/>
+    <path d="M50 28c-13 0-22 9-22 22 0 9 5 16 13 19-1-9 3-16 11-20-6 6-8 13-6 21 9-1 18-9 18-22 0-12-7-20-14-20Z" fill="#22C55E"/>
+  </svg>
+</template>
+
+<nav>
+  <div class="wrap nav-in">
+    <div class="brand">
+      <img src="assets/logo-mark.png" alt="GreenMind" />
+      <div class="gm-wordmark"><span class="g">Green</span><span class="m">Mind</span></div>
+    </div>
+    <div class="nav-links">
+      <a href="#recursos">Recursos</a>
+      <a href="#regra">Regra 50/30/20</a>
+      <a href="#sonho">Metas</a>
+      <a href="#como">Como funciona</a>
+      <a href="#precos">Preços</a>
+    </div>
+    <div class="nav-cta">
+      <button class="theme-toggle" id="themeToggle" aria-label="Alternar tema claro/escuro">
+        <svg class="ic-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4 7 7 0 1 0 20 14.5Z"/></svg>
+        <svg class="ic-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7"/></svg>
+      </button>
+      <a href="Green Mind — App.html" class="btn btn-ghost">Entrar</a>
+      <a href="Green Mind — App.html" class="btn btn-primary">Criar conta</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap hero-in">
+    <div class="hero-copy">
+      <span class="pill"><i></i> Controle financeiro pessoal · simples e seguro</span>
+      <h1>Dinheiro que <span class="accent">cresce</span> com clareza.</h1>
+      <p class="lead">Organize receitas e despesas, domine a regra 50/30/20 e veja seus sonhos saírem do papel — tudo num app simples, para todas as idades.</p>
+      <div class="hero-actions">
+        <a href="Green Mind — App.html" class="btn btn-primary btn-lg">Começar agora →</a>
+        <a href="#como" class="btn btn-ghost btn-lg">Ver como funciona</a>
+      </div>
+      <div class="stores">
+        <span class="rate"><span class="stars">★★★★★</span> 4,9</span>
+        <span>+120 mil pessoas organizando o dinheiro</span>
+      </div>
+    </div>
+    <div class="hero-phone">
+      <div class="device">
+        <div class="device-screen">
+          <div class="ds-status"><span class="num">9:41</span><span class="num">📶 96%</span></div>
+          <div class="ds-hero">
+            <div class="ds-hero-top"><span>Saldo do mês · Junho</span><span class="ds-rate num">56%</span></div>
+            <div class="ds-amount num">R$ 7.604,80</div>
+            <div class="ds-chips">
+              <div class="ds-chip"><small>Receitas</small><b class="num">R$ 13.612</b></div>
+              <div class="ds-chip"><small>Despesas</small><b class="num">R$ 6.007</b></div>
+            </div>
+          </div>
+          <div class="ds-card">
+            <div class="ds-card-h">REGRA 50 / 30 / 20</div>
+            <div class="ds-alloc">
+              <div class="ds-arow"><span class="ds-dot" style="background:#38BDF8;"></span><span class="ds-lab">Essencial</span><span class="ds-bar"><i style="width:54%;background:#38BDF8;"></i></span></div>
+              <div class="ds-arow"><span class="ds-dot" style="background:#FBBF24;"></span><span class="ds-lab">Pessoal</span><span class="ds-bar"><i style="width:30%;background:#FBBF24;"></i></span></div>
+              <div class="ds-arow"><span class="ds-dot" style="background:#22C55E;"></span><span class="ds-lab">Investir</span><span class="ds-bar"><i style="width:68%;background:#22C55E;"></i></span></div>
+            </div>
+          </div>
+          <div class="ds-card ds-flush">
+            <div class="ds-tx"><span class="ds-tx-ic" style="background:#DCFCE7;color:#16A34A;">＋</span><div class="ds-tx-m"><b>Salário</b><span>Receita · 5 jun</span></div><span class="ds-tx-a pos num">+ R$ 9.800</span></div>
+            <div class="ds-tx"><span class="ds-tx-ic" style="background:#E0F2FE;color:#0EA5E9;">⌂</span><div class="ds-tx-m"><b>Aluguel</b><span>Essencial · 5 jun</span></div><span class="ds-tx-a neg num">− R$ 2.100</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="float-card fc-1">
+        <span class="fc-ic" style="background:#DCFCE7;color:#16A34A;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></svg></span>
+        <div><small>Taxa de poupança</small><b class="num">56%</b></div>
+      </div>
+      <div class="float-card fc-2">
+        <span class="fc-ic" style="background:#FEF3C7;color:#F59E0B;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/></svg></span>
+        <div><small>Meta · Reserva</small><b class="num">65% concluído</b></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="trust">
+  <div class="wrap trust-in">
+    <div class="stat"><div class="big num">120 mil+</div><div class="lbl">pessoas usando</div></div>
+    <div class="stat"><div class="big num">R$ 2,4 bi</div><div class="lbl">organizados no app</div></div>
+    <div class="stat"><div class="big num">50/30/20</div><div class="lbl">orçamento guiado</div></div>
+    <div class="stat"><div class="big num">4,9 ★</div><div class="lbl">nas lojas de apps</div></div>
+  </div>
+</div>
+
+<section class="block" id="recursos">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow2">Tudo num lugar</span>
+      <h2>Seu dinheiro sob controle, sem esforço</h2>
+      <p>Do salário ao sonho — o Green Mind acompanha cada real com a calma de quem sabe pra onde está indo.</p>
+    </div>
+    <div class="feat-grid">
+      <div class="feat">
+        <div class="f-ic" style="background:var(--gm-grad-dark);color:#fff;"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M7 16l4-5 3 3 5-7"/></svg></div>
+        <h3>Visão em tempo real</h3>
+        <p>Saldo, receitas, despesas e taxa de poupança do mês — atualizados a cada lançamento.</p>
+      </div>
+      <div class="feat">
+        <div class="f-ic" style="background:#E0F2FE;color:#0EA5E9;"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 12V3.5"/><path d="M12 12l6 4.2"/></svg></div>
+        <h3>Orçamento 50/30/20</h3>
+        <p>Cada despesa entra em essencial, pessoal ou investimento — com metas e alertas automáticos.</p>
+      </div>
+      <div class="feat">
+        <div class="f-ic" style="background:#FEF3C7;color:#F59E0B;"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z"/></svg></div>
+        <h3>Metas</h3>
+        <p>Metas com método: o que alcançar, o que parar e como fazer. Progresso e prazo sempre à vista.</p>
+      </div>
+      <div class="feat">
+        <div class="f-ic" style="background:#DCFCE7;color:#16A34A;"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M2.5 9.5h19"/><path d="M6 15h4"/></svg></div>
+        <h3>Cartões & faturas</h3>
+        <p>Acompanhe limite, fatura e parcelas de cada cartão sem se perder no fim do mês.</p>
+      </div>
+      <div class="feat">
+        <div class="f-ic" style="background:#EDE9FE;color:#8B5CF6;"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v9l7 4"/><path d="M21 12a9 9 0 1 1-9-9"/></svg></div>
+        <h3>Relatórios claros</h3>
+        <p>Veja para onde foi cada categoria e compare meses sem precisar de planilha.</p>
+      </div>
+      <div class="feat">
+        <div class="f-ic" style="background:var(--gm-mint);color:var(--gm-forest);"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18"/><circle cx="17" cy="13.5" r="1.3"/></svg></div>
+        <h3>Simples pra qualquer um</h3>
+        <p>Linguagem sem jargão e telas grandes. Funciona pra você e pra sua família.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="regra" style="padding-top:0;">
+  <div class="wrap">
+    <div class="showcase">
+      <div class="showcase-in">
+        <div>
+          <span class="eyebrow2" style="color:#86efac;">A regra que muda tudo</span>
+          <h2 style="margin-top:12px;">50% essencial.<br/>30% pessoal.<br/>20% pro futuro.</h2>
+          <p>O Green Mind classifica cada gasto automaticamente e mostra, em barras vivas, se você está dentro da meta. Sem culpa — só clareza pra ajustar a rota.</p>
+          <a href="Green Mind — App.html" class="btn btn-primary btn-lg">Equilibrar meu orçamento →</a>
+        </div>
+        <div class="alloc-demo">
+          <div class="ad-row">
+            <div class="ad-top"><span class="lab"><i style="background:#38BDF8;"></i> Essencial <small>meta 50%</small></span><span class="ad-val">47%</span></div>
+            <div class="ad-bar"><span style="width:94%;background:#38BDF8;"></span></div>
+          </div>
+          <div class="ad-row">
+            <div class="ad-top"><span class="lab"><i style="background:#FBBF24;"></i> Pessoal <small>meta 30%</small></span><span class="ad-val">28%</span></div>
+            <div class="ad-bar"><span style="width:93%;background:#FBBF24;"></span></div>
+          </div>
+          <div class="ad-row">
+            <div class="ad-top"><span class="lab"><i style="background:#4ADE80;"></i> Investimento <small>meta 20%</small></span><span class="ad-val">25%</span></div>
+            <div class="ad-bar"><span style="width:100%;background:#4ADE80;"></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="como" style="padding-top:0;">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow2">Como funciona</span>
+      <h2>Comece em três passos</h2>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="n">1</div>
+        <h3>Crie sua conta</h3>
+        <p>Cadastro em menos de um minuto. Entre com biometria nas próximas vezes.</p>
+      </div>
+      <div class="step">
+        <div class="n">2</div>
+        <h3>Registre o mês</h3>
+        <p>Adicione receitas e despesas em segundos. A categoria já cai na regra 50/30/20 sozinha.</p>
+      </div>
+      <div class="step">
+        <div class="n">3</div>
+        <h3>Realize seus sonhos</h3>
+        <p>Defina suas metas e acompanhe o progresso até cada conquista.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="precos" style="padding-top:0;">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow2">Planos</span>
+      <h2>Escolha o plano do seu momento</h2>
+      <p>Comece com 7 dias grátis para testar. Sem fidelidade — cancele quando quiser.</p>
+      <div class="price-toggle" id="priceToggle">
+        <button data-cycle="m" class="on">Mensal</button>
+        <button data-cycle="a">Anual <span class="save">2 meses grátis</span></button>
+      </div>
+    </div>
+    <div class="plan-grid">
+      <div class="plan">
+        <div class="plan-name">Essencial</div>
+        <p class="plan-desc">Pra quem quer organizar o próprio dinheiro e o MEI, sozinho.</p>
+        <div class="plan-price"><span class="cur">R$</span><span class="val" data-m="29" data-a="24">29</span><span class="per">/mês</span></div>
+        <p class="plan-billed" data-billed-m="" data-billed-a="Cobrado R$ 290/ano"></p>
+        <ul class="plan-feats">
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Lançamentos ilimitados</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Regra 50/30/20 automática</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>1 cartão de crédito</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Controle de MEI</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Relatórios do mês</li>
+        </ul>
+        <a href="Green Mind — App.html" class="btn btn-ghost" style="border:1.5px solid var(--gm-line);">Começar teste</a>
+      </div>
+
+      <div class="plan feature">
+        <span class="plan-badge">Mais popular</span>
+        <div class="plan-name">Pro</div>
+        <p class="plan-desc">O completo: todos os recursos pra dominar suas finanças.</p>
+        <div class="plan-price"><span class="cur">R$</span><span class="val" data-m="49" data-a="41">49</span><span class="per">/mês</span></div>
+        <p class="plan-billed" data-billed-m="" data-billed-a="Cobrado R$ 490/ano"></p>
+        <ul class="plan-feats">
+          <li class="lead"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Tudo do Essencial, e mais:</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Cartões ilimitados</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Relatórios e comparativos completos</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Metas ilimitadas com método</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Exportação de dados</li>
+        </ul>
+        <a href="Green Mind — App.html" class="btn btn-primary">Começar teste</a>
+      </div>
+
+      <div class="plan">
+        <div class="plan-name">Família</div>
+        <p class="plan-desc">Pra casais e famílias — dois MEIs e dados compartilhados.</p>
+        <div class="plan-price"><span class="cur">R$</span><span class="val" data-m="69" data-a="58">69</span><span class="per">/mês</span></div>
+        <p class="plan-billed" data-billed-m="" data-billed-a="Cobrado R$ 690/ano"></p>
+        <ul class="plan-feats">
+          <li class="lead"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Tudo do Pro, e mais:</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>2 MEIs no mesmo plano</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Compartilhamento em tempo real do casal</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Até 4 perfis</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Suporte prioritário</li>
+        </ul>
+        <a href="Green Mind — App.html" class="btn btn-ghost" style="border:1.5px solid var(--gm-line);">Começar teste</a>
+      </div>
+    </div>
+    <p class="price-note">Todos os planos incluem <b>7 dias grátis</b> · pagamento seguro · cancele quando quiser.</p>
+  </div>
+</section>
+
+<section class="cta" id="sonho">
+  <div class="wrap cta-in">
+    <span class="eyebrow2">Metas</span>
+    <h2>Todo sonho começa<br/>com um plano.</h2>
+    <p>Junte-se a quem já transformou o jeito de lidar com dinheiro.</p>
+    <a href="Green Mind — App.html" class="btn btn-primary btn-lg">Criar minha conta →</a>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-in">
+      <div class="foot-brand">
+        <div class="gm-wordmark on-dark"><span class="g">Green</span><span class="m">Mind</span></div>
+        <p>O app de controle financeiro pessoal que faz seu dinheiro crescer com clareza.</p>
+      </div>
+      <div class="foot-cols">
+        <div class="foot-col">
+          <h4>Produto</h4>
+          <a href="#recursos">Recursos</a>
+          <a href="#regra">Regra 50/30/20</a>
+          <a href="#sonho">Metas</a>
+          <a href="Green Mind — App.html">Abrir o app</a>
+        </div>
+        <div class="foot-col">
+          <h4>Empresa</h4>
+          <a href="#">Sobre</a>
+          <a href="#">Blog</a>
+          <a href="#">Carreiras</a>
+        </div>
+        <div class="foot-col">
+          <h4>Suporte</h4>
+          <a href="#">Central de ajuda</a>
+          <a href="#">Segurança</a>
+          <a href="#">Contato</a>
+        </div>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>© 2026 Green Mind. Todos os direitos reservados.</span>
+      <span>Privacidade · Termos</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var root = document.documentElement;
+    var saved = localStorage.getItem('gm_theme') || 'light';
+    function apply(t) {
+      if (t === 'dark') root.setAttribute('data-theme', 'dark');
+      else root.removeAttribute('data-theme');
+      var moon = document.querySelector('.ic-moon'), sun = document.querySelector('.ic-sun');
+      if (moon && sun) { moon.style.display = t === 'dark' ? 'none' : 'block'; sun.style.display = t === 'dark' ? 'block' : 'none'; }
+    }
+    apply(saved);
+    document.getElementById('themeToggle').addEventListener('click', function () {
+      saved = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('gm_theme', saved);
+      apply(saved);
+    });
+  })();
+
+  /* Pricing: monthly / annual toggle */
+  (function () {
+    var toggle = document.getElementById('priceToggle');
+    if (!toggle) return;
+    var btns = toggle.querySelectorAll('button');
+    function setCycle(cycle) {
+      btns.forEach(function (b) { b.classList.toggle('on', b.dataset.cycle === cycle); });
+      document.querySelectorAll('.plan-price .val').forEach(function (el) {
+        el.textContent = el.getAttribute('data-' + cycle);
+      });
+      document.querySelectorAll('.plan-billed').forEach(function (el) {
+        el.textContent = el.getAttribute('data-billed-' + cycle) || '';
+      });
+    }
+    btns.forEach(function (b) {
+      b.addEventListener('click', function () { setCycle(b.dataset.cycle); });
+    });
+    setCycle('m');
+  })();
+</script>
+
+</body>
+</html>
