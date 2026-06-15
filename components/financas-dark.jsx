@@ -677,16 +677,16 @@ function parseTransacao(text,today){
   return {tipo,valor,categoria,date,meioPag,desc};
 }
 
-function QuickAddModal({onClose,onConfirm,today,dark}){
+function QuickAddModal({onClose,onConfirm,today,dark,cartoes=[]}){
   const [text,setText]=useState("");
-  const [parsed,setParsed]=useState({tipo:"despesa",valor:"",categoria:"Outros",date:today,meioPag:"pix",desc:""});
+  const [parsed,setParsed]=useState({tipo:"despesa",valor:"",categoria:"Outros",date:today,meioPag:"pix",desc:"",cartaoId:"",parcelas:1,status:false});
   const [touched,setTouched]=useState(false);
   const recRef=useRef(null);
   const [listening,setListening]=useState(false);
   const [micSupported,setMicSupported]=useState(false);
   useEffect(()=>{ if(typeof window!=="undefined"&&(window.SpeechRecognition||window.webkitSpeechRecognition)) setMicSupported(true); return ()=>{ try{ recRef.current&&recRef.current.stop(); }catch(e){} }; },[]);
   const examples=["Mercado 85,90 hoje no cartão","Gasolina 200 ontem","Recebi 3 mil de salário","Farmácia 47 reais pix","Uber 23,90","Academia 99 dia 5"];
-  const runParse=(v)=>{ const p=parseTransacao(v,today); if(p) setParsed(pp=>({tipo:p.tipo,valor:p.valor!=null?String(p.valor):"",categoria:p.categoria,date:p.date,meioPag:p.meioPag,desc:p.desc})); };
+  const runParse=(v)=>{ const p=parseTransacao(v,today); if(p) setParsed(pp=>({...pp,tipo:p.tipo,valor:p.valor!=null?String(p.valor):"",categoria:p.categoria,date:p.date,meioPag:p.meioPag,desc:p.desc})); };
   const onText=(v)=>{ setText(v); setTouched(true); runParse(v); };
   const toggleMic=()=>{
     const SR=typeof window!=="undefined"&&(window.SpeechRecognition||window.webkitSpeechRecognition);
@@ -702,7 +702,7 @@ function QuickAddModal({onClose,onConfirm,today,dark}){
   const tipoColor={despesa:T.red,receita:T.green,investimento:T.blue}[parsed.tipo];
   const tipoBg={despesa:T.redLight,receita:T.greenLight,investimento:T.blueLight}[parsed.tipo];
   const tipoLabel={despesa:"Despesa",receita:"Receita",investimento:"Investimento"}[parsed.tipo];
-  const valido=parsed.valor&&parseFloat(parsed.valor)>0&&parsed.desc;
+  const valido=parsed.valor&&parseFloat(parsed.valor)>0&&parsed.desc&&!(parsed.tipo==="despesa"&&parsed.meioPag==="cartao"&&cartoes.length>0&&!parsed.cartaoId);
   const MESC=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
   const dlabel=(()=>{const d=new Date(parsed.date+"T12:00:00");return `${d.getDate()} ${MESC[d.getMonth()]}`;})();
   const inp={background:T.surfaceAlt,border:`1.5px solid ${T.borderStrong}`,borderRadius:"9px",padding:"9px 11px",color:T.text,fontSize:"13.5px",outline:"none"};
@@ -772,6 +772,25 @@ function QuickAddModal({onClose,onConfirm,today,dark}){
                   <button key={v} onClick={()=>setParsed(p=>({...p,meioPag:v}))} style={{fontSize:"12px",fontWeight:600,padding:"6px 12px",borderRadius:"8px",cursor:"pointer",border:`1px solid ${on?T.green:T.border}`,background:on?T.greenLight:"transparent",color:on?T.green:T.textSub}}>{l}</button>
                 );})}
               </div>
+            </div>}
+            {/* Cartão + parcelas — quando despesa no cartão */}
+            {parsed.tipo==="despesa"&&parsed.meioPag==="cartao"&&<div style={{display:"grid",gridTemplateColumns:"1.4fr 1fr",gap:"8px",marginTop:"8px"}}>
+              <div>
+                <label style={{fontSize:"11px",color:T.textMuted,display:"block",marginBottom:"3px"}}>Cartão</label>
+                {cartoes.length>0
+                  ? <select value={parsed.cartaoId} onChange={e=>setParsed(p=>({...p,cartaoId:e.target.value}))} style={{...inp,width:"100%",boxSizing:"border-box"}}><option value="">Selecione…</option>{cartoes.map(c=><option key={c.id} value={c.id}>{c.nome}</option>)}</select>
+                  : <div style={{fontSize:"11.5px",color:T.amber,padding:"9px 0"}}>Nenhum cartão cadastrado — cadastre em Cartões.</div>}
+              </div>
+              <div>
+                <label style={{fontSize:"11px",color:T.textMuted,display:"block",marginBottom:"3px"}}>Parcelas</label>
+                <input type="number" min="1" max="48" value={parsed.parcelas} onChange={e=>setParsed(p=>({...p,parcelas:Math.max(1,parseInt(e.target.value)||1)}))} style={{...inp,width:"100%",boxSizing:"border-box"}}/>
+              </div>
+              {parsed.parcelas>1&&parsed.valor&&<p style={{gridColumn:"span 2",fontSize:"11.5px",color:T.textSub,margin:"2px 0 0"}}>{parsed.parcelas}× de {fmt((parseFloat(String(parsed.valor).replace(",","."))||0)/parsed.parcelas)} · vai pras faturas do cartão</p>}
+            </div>}
+            {/* Status: já efetivou? */}
+            {!(parsed.tipo==="despesa"&&parsed.meioPag==="cartao")&&<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:"10px",padding:"10px 12px",background:T.surface,border:`1px solid ${T.border}`,borderRadius:"10px"}}>
+              <span style={{fontSize:"12.5px",fontWeight:600,color:T.text}}>{parsed.tipo==="receita"?"Já recebi":parsed.tipo==="investimento"?"Já investi":"Já paguei"}<span style={{fontWeight:400,color:T.textMuted}}> · {parsed.status?"confirmado":"previsto"}</span></span>
+              <button onClick={()=>setParsed(p=>({...p,status:!p.status}))} style={{width:"44px",height:"26px",borderRadius:"999px",border:"none",cursor:"pointer",padding:"3px",background:parsed.status?T.green:T.borderStrong,transition:".2s",flexShrink:0}}><span style={{display:"block",width:"20px",height:"20px",borderRadius:"50%",background:"#fff",transform:parsed.status?"translateX(18px)":"translateX(0)",transition:".2s",boxShadow:"0 1px 3px rgba(0,0,0,.3)"}}/></button>
             </div>}
           </div>
         </div>}
@@ -1289,14 +1308,51 @@ export default function App(){
   const addParsedItem = async (p) => {
     const valor=parseFloat(String(p.valor).replace(",","."))||0;
     if(!p.desc||!valor){ showToast("Confira descrição e valor","error"); return; }
+    const MESN=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+    const parcelas=Math.max(1,parseInt(p.parcelas)||1);
+
+    // ── CASO 1: Despesa no CARTÃO → vira compra de cartão (faturas/parcelas) ──
+    if(p.tipo==="despesa"&&p.meioPag==="cartao"&&p.cartaoId){
+      const novaCompra={id:uid(),cartaoId:p.cartaoId,data:p.date||today,descricao:p.desc,categoria:p.categoria,valor,parcelas,valorParcela:parseFloat((valor/parcelas).toFixed(2))};
+      const newUso=[...usoCartoes,novaCompra];
+      setUsoCartoes(newUso);
+      setShowQuickAdd(false);
+      const cardNome=(cartoes.find(c=>c.id===p.cartaoId)||{}).nome||"cartão";
+      try{
+        await saveToSupa({allYearsData,cartoes,uso_cartoes:newUso,pagamentos,sync_url:syncUrl,cadastros,mei_data:meiData});
+        showToast(`✅ Compra de ${fmt(valor)} no ${cardNome}${parcelas>1?` em ${parcelas}×`:""}`);
+      }catch(e){ console.error(e); showToast("Lançado, mas falhou ao sincronizar","error"); }
+      return;
+    }
+
     const d=new Date((p.date||today)+"T12:00:00");
     const ty=d.getFullYear(), tm=d.getMonth();
     const key=p.tipo==="receita"?"receitas":p.tipo==="investimento"?"investimentos":"despesas";
+    const st=!!p.status;
+
+    // ── CASO 2: Despesa PARCELADA (não cartão) → distribui nos meses ──────────
+    if(p.tipo==="despesa"&&parcelas>1){
+      const valorParcela=parseFloat((valor/parcelas).toFixed(2));
+      const groupId=uid();
+      let newAll={...allYearsData};
+      for(let i=0;i<parcelas;i++){
+        let mm=tm+i, yy=ty; while(mm>11){mm-=12;yy++;}
+        const yk=String(yy);
+        const by=(Array.isArray(newAll[yk])&&newAll[yk].length===12)?newAll[yk].map(m=>({...m,despesas:[...m.despesas]})):emptyYear();
+        by[mm].despesas.push({id:uid(),desc:p.desc,valor:valorParcela,valorTotal:valor,date:p.date,ref:"",fornecedor:"",categoria:p.categoria,recorrente:false,formaPag:"parcelado",parcelas,parcelaNum:i+1,parcelaGroupId:groupId,meioPag:p.meioPag||"boleto",pago:st&&i===0});
+        newAll={...newAll,[yk]:by};
+      }
+      setAllYearsData(newAll); setShowQuickAdd(false); setCurrentYear(ty); setCurrentMonth(tm);
+      try{ await saveToSupa({allYearsData:newAll,cartoes,uso_cartoes:usoCartoes,pagamentos,sync_url:syncUrl,cadastros,mei_data:meiData}); showToast(`✅ ${parcelas} parcelas de ${fmt(valorParcela)} a partir de ${MESN[tm]}/${ty}`); }
+      catch(e){ console.error(e); showToast("Lançado, mas falhou ao sincronizar","error"); }
+      return;
+    }
+
+    // ── CASO 3: lançamento simples (respeita data + status) ──────────────────
     let item;
-    if(key==="receitas") item={id:uid(),desc:p.desc,valor,date:p.date,ref:"",cliente:"",categoria:p.categoria,formaRec:p.meioPag||"pix",banco:""};
-    else if(key==="investimentos") item={id:uid(),desc:p.desc,valor,date:p.date,ref:"",categoria:p.categoria,investido:true,banco:""};
-    else item={id:uid(),desc:p.desc,valor,date:p.date,ref:"",fornecedor:"",categoria:p.categoria,recorrente:false,formaPag:"avista",parcelas:1,meioPag:p.meioPag||"pix",pago:false};
-    // monta o novo estado completo (todos os anos) de forma síncrona p/ poder salvar já
+    if(key==="receitas") item={id:uid(),desc:p.desc,valor,date:p.date,ref:"",cliente:"",categoria:p.categoria,formaRec:p.meioPag||"pix",banco:"",recebido:st};
+    else if(key==="investimentos") item={id:uid(),desc:p.desc,valor,date:p.date,ref:"",categoria:p.categoria,investido:st,banco:""};
+    else item={id:uid(),desc:p.desc,valor,date:p.date,ref:"",fornecedor:"",categoria:p.categoria,recorrente:false,formaPag:"avista",parcelas:1,meioPag:p.meioPag||"pix",pago:st};
     const yrKey=String(ty);
     const baseYear=(Array.isArray(allYearsData[yrKey])&&allYearsData[yrKey].length===12)
       ? allYearsData[yrKey].map(m=>({...m,receitas:[...m.receitas],despesas:[...m.despesas],investimentos:[...m.investimentos],emprestimos:[...m.emprestimos]}))
@@ -1306,12 +1362,11 @@ export default function App(){
     setAllYearsData(newAllYears);
     setShowQuickAdd(false);
     setCurrentYear(ty); setCurrentMonth(tm);
-    const MESN=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
     const rotulo=p.tipo==="receita"?"Receita":p.tipo==="investimento"?"Investimento":"Despesa";
-    // PERSISTE no Supabase imediatamente (igual aos outros saves)
+    const stTxt=st?(p.tipo==="receita"?" (recebida)":p.tipo==="investimento"?" (investido)":" (paga)"):" (prevista)";
     try{
       await saveToSupa({allYearsData:newAllYears,cartoes,uso_cartoes:usoCartoes,pagamentos,sync_url:syncUrl,cadastros,mei_data:meiData});
-      showToast(`✅ ${rotulo} de ${fmt(valor)} salva em ${MESN[tm]}/${ty}`);
+      showToast(`✅ ${rotulo} de ${fmt(valor)}${stTxt} em ${MESN[tm]}/${ty}`);
     }catch(e){
       console.error("Falha ao salvar lançamento por IA",e);
       showToast("Lançado, mas falhou ao sincronizar — toque em Salvar","error");
@@ -3645,7 +3700,7 @@ Cancelar = Dar baixa só nesta parcela`);
       {showProfile&&<ProfileModal dark={dark} onToggleTheme={toggleTheme} onClose={()=>{ try{ setAvatarPhoto(gmGetPref("avatar",null)); }catch(e){} setShowProfile(false); }} onLogout={handleLogout} onExport={exportData} onReset={resetAllData} user={authUser} members={members} accountId={accountId} onUpdateMember={updateMember} onInvite={sendInvite} onSaveProfile={saveProfile} isMobile={isMobile}/>}
 
       {/* MODAL LANÇAR POR TEXTO (IA) */}
-      {showQuickAdd&&<QuickAddModal today={today} dark={dark} onClose={()=>setShowQuickAdd(false)} onConfirm={addParsedItem}/>}
+      {showQuickAdd&&<QuickAddModal today={today} dark={dark} cartoes={cartoes} onClose={()=>setShowQuickAdd(false)} onConfirm={addParsedItem}/>}
 
       {/* BOTÃO FLUTUANTE — lançar por texto */}
       <button onClick={()=>setShowQuickAdd(true)} title="Lançar por texto" style={{position:"fixed",right:isMobile?"18px":"26px",bottom:isMobile?"86px":"26px",zIndex:600,height:"56px",padding:"0 22px 0 18px",borderRadius:"999px",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:"10px",background:"linear-gradient(140deg,#4ADE80,#22C55E 45%,#166534)",color:"#fff",fontWeight:700,fontSize:"15px",boxShadow:"0 16px 34px -10px rgba(22,101,52,.7)"}}>
