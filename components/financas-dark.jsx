@@ -350,7 +350,7 @@ const PM_SECTIONS = [
   {k:"perfil",label:"Perfil",ic:"perfil"},
   {k:"casal",label:"Conta conjunta",ic:"casal",badge:"Casal"},
   {k:"prefs",label:"Preferências",ic:"prefs"},
-  {k:"regra",label:"Regra 50/30/20",ic:"regra"},
+  {k:"regra",label:"Regra & Planejamento",ic:"regra"},
   {k:"notif",label:"Notificações",ic:"notif"},
   {k:"seg",label:"Segurança",ic:"seg"},
   {k:"plano",label:"Plano & assinatura",ic:"plano"},
@@ -374,6 +374,14 @@ const pmInp = ()=>({width:"100%",background:T.surfaceAlt,border:`1.5px solid ${T
 const pmBtnGreen = ()=>({padding:"11px 20px",borderRadius:"11px",border:"none",cursor:"pointer",background:"linear-gradient(140deg,#22C55E,#166534)",color:"#fff",fontWeight:600,fontSize:"14px",boxShadow:"0 8px 18px -8px rgba(34,197,94,.7)"});
 const pmBtnGhost = ()=>({padding:"10px 18px",borderRadius:"11px",border:`1.5px solid ${T.borderStrong}`,cursor:"pointer",background:"transparent",color:T.text,fontWeight:600,fontSize:"13px"});
 function PMAvatar({name,color,size=44,photo}){const initials=(name||"?").split(" ").map(w=>w[0]).slice(0,2).join("").toUpperCase();if(photo)return <img src={photo} alt={name} style={{width:size,height:size,borderRadius:"50%",objectFit:"cover",flexShrink:0,boxShadow:"0 2px 8px rgba(0,0,0,.18)"}}/>;return <div style={{width:size,height:size,borderRadius:"50%",background:color,color:"#fff",display:"grid",placeItems:"center",fontWeight:700,fontSize:size*0.36+"px",flexShrink:0,boxShadow:"0 2px 8px rgba(0,0,0,.18)"}}>{initials}</div>;}
+// ── Feedback de "salvo" + rodapé de salvar (usado nas abas de ajustes) ──────
+function useSaved(){ const [saved,setSaved]=useState(false); const flash=()=>{ setSaved(true); setTimeout(()=>setSaved(false),1800); }; return [saved,flash]; }
+function PMSaveFooter({onSave,saved,dirty=true,label="Salvar alterações"}){
+  return <div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:"12px",marginTop:"22px",paddingTop:"16px",borderTop:`1px solid ${T.border}`}}>
+    {saved&&<span style={{fontSize:"12.5px",color:T.green,fontWeight:600}}>✓ Salvo!</span>}
+    <button onClick={onSave} disabled={!dirty} style={{...pmBtnGreen(),opacity:dirty?1:.5,cursor:dirty?"pointer":"not-allowed"}}>{label}</button>
+  </div>;
+}
 
 function PMPerfil({user,onSaveProfile}){
   const nome=user?.name||"Você"; const email=user?.email||"—";
@@ -414,12 +422,17 @@ function PMPerfil({user,onSaveProfile}){
   </div>;
 }
 function PMCasal({user,members,accountId,onUpdateMember,onInvite}){
-  const [share,setShare]=useState({lanc:true,cartoes:true,metas:true,mei:false});
+  const [share,setShare]=useState(()=>({lanc:true,cartoes:true,metas:true,mei:false,...gmGetPref("compartilha",{})}));
+  const [shareSaved,flashShare]=useSaved();
+  const shareDirty=JSON.stringify(share)!==JSON.stringify({lanc:true,cartoes:true,metas:true,mei:false,...gmGetPref("compartilha",{})});
+  const saveShare=()=>{ gmSetPref("compartilha",share); flashShare(); };
   const [permState,setPermState]=useState({});
   const [editId,setEditId]=useState(null);
   const [editForm,setEditForm]=useState({name:"",email:""});
   const [inv,setInv]=useState({email:"",role:"editar"});
   const [sending,setSending]=useState(false);
+  const [invited,setInvited]=useState(null);   // {email, role} após criar convite
+  const [copied,setCopied]=useState(false);
   const PERM={admin:{label:"Administrador",desc:"Acesso total: lança, edita, exclui, convida e gerencia o plano",c:T.green,bg:T.greenLight},editar:{label:"Pode editar",desc:"Lança, edita e exclui — mas não gerencia membros nem o plano",c:T.blue,bg:T.blueLight},ver:{label:"Somente ver",desc:"Visualiza tudo, mas não pode lançar nem alterar nada",c:T.amber,bg:T.amberLight}};
   const COLORS=["#166534","#0EA5E9","#8B5CF6","#F59E0B","#EC4899"];
   const list=Array.isArray(members)&&members.length?members:[{user_id:user?.id,email:user?.email,name:user?.name,role:"admin"}];
@@ -430,7 +443,11 @@ function PMCasal({user,members,accountId,onUpdateMember,onInvite}){
   const startEdit=(m)=>{ setEditId(m.user_id); setEditForm({name:m.name||"",email:m.email||""}); };
   const saveEdit=(m)=>{ onUpdateMember&&onUpdateMember(m.user_id,{name:editForm.name,email:editForm.email}); setEditId(null); };
   const changePerm=(m,pk)=>{ setPermState(s=>({...s,[m.user_id]:pk})); onUpdateMember&&onUpdateMember(m.user_id,{role:pk}); };
-  const doInvite=async()=>{ if(!onInvite)return; setSending(true); const ok=await onInvite(inv.email,inv.role); if(ok) setInv({email:"",role:"editar"}); setSending(false); };
+  const doInvite=async()=>{ if(!onInvite)return; setSending(true); const em=inv.email; const role=inv.role; const ok=await onInvite(em,role); if(ok){ setInvited({email:em.trim().toLowerCase(),role}); setInv({email:"",role:"editar"}); } setSending(false); };
+  const PERM_LBL={admin:"administrador",editar:"editar lançamentos",ver:"somente visualizar"};
+  const inviteMsg=invited?`Oi! Te convidei pra cuidar das nossas finanças juntos no GreenMind 💚\n\nCrie sua conta em https://www.appgreenmind.com.br usando este e-mail: ${invited.email}\nAssim você já entra direto na nossa conta conjunta (permissão: ${PERM_LBL[invited.role]}).`:"";
+  const waLink=invited?`https://wa.me/?text=${encodeURIComponent(inviteMsg)}`:"#";
+  const copyMsg=()=>{ try{ navigator.clipboard.writeText(inviteMsg); setCopied(true); setTimeout(()=>setCopied(false),1800); }catch(e){} };
   return <div>
     <div style={{background:"linear-gradient(160deg,#166534,#0F2419)",borderRadius:"18px",padding:"20px",color:"#fff",marginBottom:"18px",position:"relative",overflow:"hidden"}}>
       <div style={{position:"absolute",inset:0,opacity:.5,background:"radial-gradient(130px 130px at 90% -10%, rgba(74,222,128,.5), transparent 70%)"}}/>
@@ -479,42 +496,82 @@ function PMCasal({user,members,accountId,onUpdateMember,onInvite}){
       <p style={{fontSize:"12.5px",color:T.textSub,margin:"0 0 12px",lineHeight:1.45}}>Digite o e-mail e a permissão. Quando a pessoa criar a conta com esse e-mail, ela entra automaticamente na sua conta.</p>
       <div style={{display:"flex",gap:"8px",marginBottom:"8px"}}><input value={inv.email} onChange={e=>setInv(s=>({...s,email:e.target.value}))} style={{...pmInp(),flex:1}} placeholder="email@exemplo.com"/><select value={inv.role} onChange={e=>setInv(s=>({...s,role:e.target.value}))} style={{...pmInp(),width:"auto"}}><option value="admin">Administrador</option><option value="editar">Pode editar</option><option value="ver">Somente ver</option></select></div>
       <button onClick={doInvite} disabled={sending} style={{...pmBtnGreen(),width:"100%",opacity:sending?.6:1,cursor:sending?"not-allowed":"pointer"}}>{sending?"Enviando…":"Criar convite"}</button>
-      <p style={{fontSize:"11px",color:T.textMuted,margin:"9px 2px 0",lineHeight:1.4}}>O e-mail automático de aviso entra em breve. Por ora, avise a pessoa para criar a conta com esse mesmo e-mail.</p>
+      {invited&&(
+        <div style={{marginTop:"12px",padding:"13px",borderRadius:"12px",background:T.greenLight,border:`1px solid ${T.green}40`}}>
+          <p style={{fontSize:"12.5px",fontWeight:600,color:T.green,margin:"0 0 3px"}}>✓ Convite criado para {invited.email}</p>
+          <p style={{fontSize:"12px",color:T.textSub,margin:"0 0 11px",lineHeight:1.45}}>Agora avise a pessoa para criar a conta com esse e-mail. Mande o convite por aqui:</p>
+          <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
+            <a href={waLink} target="_blank" rel="noopener noreferrer" style={{flex:1,minWidth:"130px",textAlign:"center",textDecoration:"none",padding:"10px 14px",borderRadius:"10px",background:"#25D366",color:"#fff",fontWeight:600,fontSize:"13px"}}>📲 Enviar no WhatsApp</a>
+            <button onClick={copyMsg} style={{flex:1,minWidth:"130px",padding:"10px 14px",borderRadius:"10px",border:`1.5px solid ${T.borderStrong}`,background:T.surface,color:T.text,fontWeight:600,fontSize:"13px",cursor:"pointer"}}>{copied?"✓ Copiado!":"📋 Copiar convite"}</button>
+          </div>
+        </div>
+      )}
+      <p style={{fontSize:"11px",color:T.textMuted,margin:"9px 2px 0",lineHeight:1.4}}>Assim que a pessoa entrar com esse e-mail, os dados passam a sincronizar em tempo real entre vocês.</p>
     </div>
     <p style={{fontSize:"13px",fontWeight:700,color:T.text,margin:"20px 0 4px"}}>O que vocês compartilham</p>
     <PMRow label="Lançamentos & saldo" desc="Receitas, despesas e o saldo do mês" right={<PMToggle on={share.lanc} onClick={()=>setShare(s=>({...s,lanc:!s.lanc}))}/>}/>
     <PMRow label="Cartões & faturas" desc="Limites, faturas e parcelas" right={<PMToggle on={share.cartoes} onClick={()=>setShare(s=>({...s,cartoes:!s.cartoes}))}/>}/>
     <PMRow label="Metas" desc="Objetivos e progresso" right={<PMToggle on={share.metas} onClick={()=>setShare(s=>({...s,metas:!s.metas}))}/>}/>
     <PMRow label="MEI de cada um" desc="Mantenha o MEI individual privado se preferir" right={<PMToggle on={share.mei} onClick={()=>setShare(s=>({...s,mei:!s.mei}))}/>}/>
+    <PMSaveFooter onSave={saveShare} saved={shareSaved} dirty={shareDirty} label="Salvar compartilhamento"/>
   </div>;
 }
 function PMPrefs({dark,onToggleTheme}){
-  const [moeda,setMoeda]=usePref("moeda","BRL");
-  const [fech,setFech]=usePref("fechamento","1");
-  const [semana,setSemana]=usePref("semana","domingo");
+  const [moeda,setMoeda]=useState(()=>gmGetPref("moeda","BRL"));
+  const [fech,setFech]=useState(()=>gmGetPref("fechamento","1"));
+  const [semana,setSemana]=useState(()=>gmGetPref("semana","domingo"));
+  const [saved,flash]=useSaved();
+  const dirty=moeda!==gmGetPref("moeda","BRL")||fech!==gmGetPref("fechamento","1")||semana!==gmGetPref("semana","domingo");
+  const save=()=>{ gmSetPref("moeda",moeda); gmSetPref("fechamento",fech); gmSetPref("semana",semana); flash(); };
   return <div>
-    <p style={{fontSize:"11.5px",color:T.green,margin:"0 0 14px",fontWeight:600}}>✓ Alterações salvas automaticamente neste aparelho</p>
+    <p style={{fontSize:"11.5px",color:T.textMuted,margin:"0 0 14px"}}>O tema muda na hora. Os demais ajustes entram ao tocar em <b style={{color:T.text}}>Salvar</b>.</p>
     <p style={{fontSize:"13px",fontWeight:700,color:T.text,margin:"0 0 4px"}}>Aparência</p>
     <PMRow label="Tema" desc="Claro ou escuro" right={<div style={{display:"flex",gap:"4px",background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:"10px",padding:"3px"}}>{[["light","Claro"],["dark","Escuro"]].map(([k,l])=>{const on=(k==="dark")===dark;return <button key={k} onClick={()=>{if(on)return;onToggleTheme();}} style={{border:"none",cursor:"pointer",fontSize:"12.5px",fontWeight:600,padding:"7px 14px",borderRadius:"8px",background:on?T.surface:"transparent",color:on?T.text:T.textSub,boxShadow:on?"0 1px 3px rgba(0,0,0,.15)":"none"}}>{l}</button>;})}</div>}/>
     <p style={{fontSize:"13px",fontWeight:700,color:T.text,margin:"22px 0 4px"}}>Regional</p>
     <PMRow label="Moeda" right={<select value={moeda} onChange={e=>setMoeda(e.target.value)} style={{...pmInp(),width:"auto"}}><option value="BRL">Real (R$)</option><option value="USD">Dólar (US$)</option><option value="EUR">Euro (€)</option></select>}/>
     <PMRow label="Dia de fechamento do mês" desc="Quando seu mês financeiro vira (ex.: dia do salário)" right={<select value={fech} onChange={e=>setFech(e.target.value)} style={{...pmInp(),width:"auto"}}>{[1,5,10,15,20,25].map(d=><option key={d} value={String(d)}>Dia {d}</option>)}</select>}/>
     <PMRow label="Começo da semana" right={<select value={semana} onChange={e=>setSemana(e.target.value)} style={{...pmInp(),width:"auto"}}><option value="domingo">Domingo</option><option value="segunda">Segunda</option></select>}/>
+    <PMSaveFooter onSave={save} saved={saved} dirty={dirty} label="Salvar preferências"/>
   </div>;
 }
+const PLANO_DEFAULT={lazer:30,fixos:60,investir:10,reservaMeses:6,liberdadeMult:200};
 function PMRegra(){
-  const [v,setV]=usePref("regra",{ess:50,pes:30,inv:20});const total=v.ess+v.pes+v.inv;
-  const bars=[["ess","Essencial","#38BDF8","Moradia, contas, mercado"],["pes","Pessoal","#FBBF24","Lazer, roupas, hobbies"],["inv","Investir & metas","#22C55E","Poupança, reserva, sonhos"]];
+  const [v,setV]=useState(()=>({...PLANO_DEFAULT,...gmGetPref("plano",{})}));
+  const [saved,flash]=useSaved();
+  const total=v.lazer+v.fixos+v.investir;
+  const saved0={...PLANO_DEFAULT,...gmGetPref("plano",{})};
+  const dirty=JSON.stringify(v)!==JSON.stringify(saved0);
+  const save=()=>{ if(total!==100) return; gmSetPref("plano",v); flash(); };
+  const bars=[["fixos","Custos fixos","#EF4444","Moradia, contas, mercado, transporte"],["lazer","Estilo de vida","#8B5CF6","Lazer, comida fora, hobbies"],["investir","Investir","#22C55E","Aporte mensal para os seus objetivos"]];
   return <div>
-    <p style={{fontSize:"13.5px",color:T.textSub,margin:"0 0 18px",lineHeight:1.5}}>O padrão é <b style={{color:T.text}}>50/30/20</b>, mas você pode ajustar para o que faz sentido pra vocês (ex.: 60/20/20).</p>
+    <p style={{fontSize:"13.5px",color:T.textSub,margin:"0 0 16px",lineHeight:1.5}}>Estes valores alimentam a aba <b style={{color:T.text}}>🎯 Planejamento</b> — os 5 passos para a sua liberdade financeira. O padrão é <b style={{color:T.text}}>60 / 30 / 10</b>, mas ajuste como fizer sentido pra vocês.</p>
+    <p style={{fontSize:"12px",fontWeight:700,color:T.textSub,textTransform:"uppercase",letterSpacing:".05em",margin:"0 0 12px"}}>Divisão da renda mensal</p>
     {bars.map(([k,l,c,d])=>(<div key={k} style={{marginBottom:"18px"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}><span style={{display:"flex",alignItems:"center",gap:"9px",fontSize:"14px",fontWeight:500,color:T.text}}><span style={{width:"11px",height:"11px",borderRadius:"3px",background:c}}/>{l} <span style={{fontSize:"12px",color:T.textMuted,fontWeight:400}}>· {d}</span></span><span style={{fontSize:"15px",fontWeight:700,color:T.text}}>{v[k]}%</span></div><input type="range" min="0" max="100" value={v[k]} onChange={e=>setV(s=>({...s,[k]:+e.target.value}))} style={{width:"100%",accentColor:c}}/></div>))}
-    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 14px",borderRadius:"11px",background:total===100?T.greenLight:T.redLight,border:`1px solid ${total===100?T.green+"40":T.red+"40"}`,marginTop:"4px"}}><span style={{fontSize:"13px",fontWeight:600,color:total===100?T.green:T.red}}>{total===100?"✓ Soma 100% — perfeito":`Soma ${total}% — ajuste para 100%`}</span><button onClick={()=>setV({ess:50,pes:30,inv:20})} style={{...pmBtnGhost(),padding:"6px 12px",fontSize:"12px"}}>Restaurar padrão</button></div>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 14px",borderRadius:"11px",background:total===100?T.greenLight:T.redLight,border:`1px solid ${total===100?T.green+"40":T.red+"40"}`,marginBottom:"22px"}}><span style={{fontSize:"13px",fontWeight:600,color:total===100?T.green:T.red}}>{total===100?"✓ Soma 100% — perfeito":`Soma ${total}% — ajuste para 100%`}</span><button onClick={()=>setV({...PLANO_DEFAULT})} style={{...pmBtnGhost(),padding:"6px 12px",fontSize:"12px"}}>Restaurar padrão</button></div>
+    <p style={{fontSize:"12px",fontWeight:700,color:T.textSub,textTransform:"uppercase",letterSpacing:".05em",margin:"0 0 12px"}}>Metas de patrimônio</p>
+    <div style={{display:"flex",gap:"10px",marginBottom:"4px"}}>
+      <div style={{flex:1,background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:"12px",padding:"13px"}}>
+        <p style={{fontSize:"12.5px",fontWeight:600,color:T.text,margin:"0 0 2px"}}>🛟 Reserva de emergência</p>
+        <p style={{fontSize:"11.5px",color:T.textMuted,margin:"0 0 9px"}}>Meses de renda guardados</p>
+        <div style={{display:"flex",alignItems:"center",gap:"8px"}}><input type="number" min="1" max="24" value={v.reservaMeses} onChange={e=>setV(s=>({...s,reservaMeses:Math.max(1,Math.min(24,+e.target.value||0))}))} style={{...pmInp(),width:"70px",textAlign:"center"}}/><span style={{fontSize:"13px",color:T.textSub}}>× renda</span></div>
+      </div>
+      <div style={{flex:1,background:T.surfaceAlt,border:`1px solid ${T.border}`,borderRadius:"12px",padding:"13px"}}>
+        <p style={{fontSize:"12.5px",fontWeight:600,color:T.text,margin:"0 0 2px"}}>🌴 Liberdade financeira</p>
+        <p style={{fontSize:"11.5px",color:T.textMuted,margin:"0 0 9px"}}>Patrimônio p/ viver de renda</p>
+        <div style={{display:"flex",alignItems:"center",gap:"8px"}}><input type="number" min="50" max="400" step="10" value={v.liberdadeMult} onChange={e=>setV(s=>({...s,liberdadeMult:Math.max(50,Math.min(400,+e.target.value||0))}))} style={{...pmInp(),width:"80px",textAlign:"center"}}/><span style={{fontSize:"13px",color:T.textSub}}>× renda</span></div>
+      </div>
+    </div>
+    <PMSaveFooter onSave={save} saved={saved} dirty={dirty&&total===100} label="Salvar planejamento"/>
   </div>;
 }
 function PMNotif(){
-  const [n,setN]=usePref("notif",{fatura:true,lancar:true,meta:true,resumo:true,mei:true,casal:true});
+  const def={fatura:true,lancar:true,meta:true,resumo:true,mei:true,casal:true};
+  const [n,setN]=useState(()=>({...def,...gmGetPref("notif",{})}));
+  const [saved,flash]=useSaved();
+  const dirty=JSON.stringify(n)!==JSON.stringify({...def,...gmGetPref("notif",{})});
+  const save=()=>{ gmSetPref("notif",n); flash(); };
   const items=[["fatura","Vencimento de faturas","Avisa 3 dias antes de cada fatura"],["lancar","Lembrete de lançar","Toda noite, se você não registrou nada"],["meta","Meta atingida","Quando você bate um objetivo 🎉"],["resumo","Resumo mensal","No 1º dia do mês, um balanço do mês anterior"],["mei","Alerta de limite MEI","Quando a projeção passar de 80% do limite"],["casal","Atividade compartilhada","Quando alguém da conta adiciona ou edita algo"]];
-  return <div>{items.map(([k,l,d])=><PMRow key={k} label={l} desc={d} right={<PMToggle on={n[k]} onClick={()=>setN(s=>({...s,[k]:!s[k]}))}/>}/>)}</div>;
+  return <div>{items.map(([k,l,d])=><PMRow key={k} label={l} desc={d} right={<PMToggle on={n[k]} onClick={()=>setN(s=>({...s,[k]:!s[k]}))}/>}/>)}<PMSaveFooter onSave={save} saved={saved} dirty={dirty} label="Salvar notificações"/></div>;
 }
 function PMSeg(){
   const [bio,setBio]=usePref("bio",false),[twofa,setTwofa]=usePref("twofa",false);
@@ -535,10 +592,11 @@ function PMPlano(){
     <button style={{background:"none",border:"none",color:T.red,fontSize:"13px",fontWeight:600,cursor:"pointer",marginTop:"14px",padding:0,opacity:.5}} disabled>Cancelar assinatura</button>
   </div>;
 }
-function PMDados({onExport,onReset}){
+function PMDados({onExport,onExportCSV,onReset}){
   return <div>
     <PMRow label="Backup automático" desc="Seus dados ficam salvos na nuvem com segurança" right={<PMToggle on={true} onClick={()=>{}}/>}/>
-    <PMRow label="Exportar meus dados" desc="Baixe tudo em JSON (LGPD)" right={<button style={pmBtnGhost()} onClick={onExport}>Exportar</button>}/>
+    <PMRow label="Exportar planilha (CSV / Excel)" desc="Todos os lançamentos em planilha — abre no Excel e Google Sheets" right={<button style={pmBtnGhost()} onClick={onExportCSV}>Baixar CSV</button>}/>
+    <PMRow label="Exportar backup completo" desc="Todos os dados em JSON (LGPD), para restaurar depois" right={<button style={pmBtnGhost()} onClick={onExport}>Baixar JSON</button>}/>
     <div style={{background:T.redLight,border:`1px solid ${T.red}30`,borderRadius:"12px",padding:"16px",marginTop:"18px"}}>
       <p style={{fontSize:"13.5px",fontWeight:700,color:T.red,margin:"0 0 4px"}}>Zona de perigo</p>
       <p style={{fontSize:"12.5px",color:T.textSub,margin:"0 0 12px",lineHeight:1.45}}>Ações abaixo não podem ser desfeitas. Recomendamos exportar seus dados antes.</p>
@@ -549,11 +607,11 @@ function PMDados({onExport,onReset}){
     </div>
   </div>;
 }
-function ProfileModal({dark,onToggleTheme,onClose,onLogout,onExport,onReset,user,members,accountId,onUpdateMember,onInvite,onSaveProfile,isMobile}){
+function ProfileModal({dark,onToggleTheme,onClose,onLogout,onExport,onExportCSV,onReset,user,members,accountId,onUpdateMember,onInvite,onSaveProfile,isMobile}){
   const [sec,setSec]=useState("perfil");
   const Body={perfil:PMPerfil,casal:PMCasal,prefs:PMPrefs,regra:PMRegra,notif:PMNotif,seg:PMSeg,plano:PMPlano,dados:PMDados}[sec];
   const cur=PM_SECTIONS.find(s=>s.k===sec);
-  const subt={perfil:"Seus dados pessoais e acesso",casal:"Compartilhe tudo com quem você ama",prefs:"Deixe o app do seu jeito",regra:"Personalize seu orçamento",notif:"Escolha o que quer receber",seg:"Proteja sua conta",plano:"Gerencie sua assinatura",dados:"Controle total dos seus dados"}[sec];
+  const subt={perfil:"Seus dados pessoais e acesso",casal:"Compartilhe tudo com quem você ama",prefs:"Deixe o app do seu jeito",regra:"Ajuste a divisão da renda e as metas dos 5 passos",notif:"Escolha o que quer receber",seg:"Proteja sua conta",plano:"Gerencie sua assinatura",dados:"Controle total dos seus dados"}[sec];
   return (
     <div style={{position:"fixed",inset:0,zIndex:700,background:"rgba(0,0,0,.5)",backdropFilter:"blur(5px)",display:"flex",alignItems:"center",justifyContent:"center",padding:isMobile?"0":"20px"}} onClick={onClose}>
       <div onClick={e=>e.stopPropagation()} style={{background:T.surface,borderRadius:isMobile?"0":"22px",width:"860px",maxWidth:"96vw",height:isMobile?"100vh":"640px",maxHeight:isMobile?"100vh":"92vh",display:"flex",flexDirection:isMobile?"column":"row",overflow:"hidden",boxShadow:"0 40px 90px -30px rgba(0,0,0,.6)",border:`1px solid ${T.border}`}}>
@@ -571,7 +629,7 @@ function ProfileModal({dark,onToggleTheme,onClose,onLogout,onExport,onReset,user
             <div><h2 style={{fontSize:"18px",fontWeight:700,color:T.text,margin:0}}>{cur.label}</h2><p style={{fontSize:"12.5px",color:T.textSub,margin:"2px 0 0"}}>{subt}</p></div>
             <button onClick={onClose} style={{width:"36px",height:"36px",borderRadius:"10px",border:`1px solid ${T.border}`,background:T.surface,color:T.textSub,cursor:"pointer",display:"grid",placeItems:"center",flexShrink:0}}><PMI d="M18 6 6 18M6 6l12 12"/></button>
           </div>
-          <div style={{flex:1,overflowY:"auto",padding:"22px"}}><Body user={user} members={members} accountId={accountId} onUpdateMember={onUpdateMember} onInvite={onInvite} onSaveProfile={onSaveProfile} onReset={onReset} dark={dark} onToggleTheme={onToggleTheme} onExport={onExport}/></div>
+          <div style={{flex:1,overflowY:"auto",padding:"22px"}}><Body user={user} members={members} accountId={accountId} onUpdateMember={onUpdateMember} onInvite={onInvite} onSaveProfile={onSaveProfile} onReset={onReset} dark={dark} onToggleTheme={onToggleTheme} onExport={onExport} onExportCSV={onExportCSV}/></div>
           {isMobile&&<div style={{padding:"12px 22px",borderTop:`1px solid ${T.border}`}}><button onClick={onLogout} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:"8px",padding:"12px",borderRadius:"11px",border:`1px solid ${T.red}40`,cursor:"pointer",background:T.redLight,color:T.red,fontWeight:600,fontSize:"14px"}}><PMI d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" s={17}/>Sair da conta</button></div>}
         </div>
       </div>
@@ -939,6 +997,26 @@ export default function App(){
     }catch(e){ console.error(e); showToast(e.message||"Erro ao salvar perfil","error"); return false; }
   };
   const exportData = ()=>{ const b=new Blob([JSON.stringify({allYearsData,cartoes,usoCartoes,pagamentos,cadastros,mei_data:meiData},null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=`greenmind_dados.json`;a.click();showToast("Exportado!"); };
+  const exportCSV = ()=>{
+    const header=["Ano","Mês","Tipo","Descrição","Categoria","Valor","Data","Situação","Recorrente","Juros/Multa","Conta/Banco"];
+    const rows=[header];
+    const tipos=[["Receita","receitas","recebido"],["Despesa","despesas","pago"],["Investimento","investimentos","investido"],["Empréstimo","emprestimos","pago"]];
+    Object.entries(allYearsData||{}).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([year,months])=>{
+      if(!Array.isArray(months)) return;
+      months.forEach((m,mi)=>{
+        tipos.forEach(([label,key,sf])=>{
+          (m[key]||[]).forEach(it=>{
+            rows.push([year, MONTHS[mi], label, it.desc||"", it.categoria||it.cat||"", String(it.valor||0).toFixed(2).replace(".",","), it.date||it.data||"", it[sf]?"Efetivado":"Previsto", it.recorrente?"Sim":"Não", String(it.jurosMulta||0).toFixed(2).replace(".",","), it.banco||it.conta||it.fornecedor||""]);
+          });
+        });
+      });
+    });
+    if(rows.length===1){ showToast("Nada para exportar ainda","info"); return; }
+    const csv="\uFEFF"+rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(";")).join("\r\n");
+    const b=new Blob([csv],{type:"text/csv;charset=utf-8"});
+    const a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download="greenmind_planilha.csv"; a.click();
+    showToast(`✅ Planilha exportada (${rows.length-1} lançamentos)`);
+  };
   const resetAllData = async()=>{
     const ok=typeof window!=="undefined"?window.confirm("Tem certeza que deseja ZERAR TUDO?\n\nIsto apaga lançamentos, cartões, metas e MEIs desta conta e volta ao estado inicial. Não dá para desfazer.\n\nDica: exporte seus dados antes (botão Exportar)."):false;
     if(!ok) return;
@@ -2300,17 +2378,18 @@ Cancelar = Dar baixa só nesta parcela`);
           const aporteMes = invTotal;
           const sobra = renda - despMes - aporteMes; // disponível p/ estilo de vida
           const patrimonio = Object.values(allYearsData).reduce((s,yr)=>Array.isArray(yr)?s+yr.reduce((ss,m)=>ss+sumArr((m.investimentos||[]).filter(x=>x.investido)),0):s,0);
+          const PL={lazer:30,fixos:60,investir:10,reservaMeses:6,liberdadeMult:200,...gmGetPref("plano",{})};
           const C={ok:T.green,over:T.red,build:T.amber,low:T.amber};
           const steps=[
-            {n:1,emoji:"🎡",c:T.indigo,title:"Estilo de vida & lazer",ideal:renda*0.3,real:sobra,kind:"floor",unit:"sobra no mês",
+            {n:1,emoji:"🎡",c:T.indigo,title:"Estilo de vida & lazer",ideal:renda*(PL.lazer/100),real:sobra,kind:"floor",unit:"sobra no mês",
               rec:(ok,d)=>ok?"Você tem folga para aproveitar a vida sem culpa.":(sobra<0?"⚠️ Você está gastando mais do que ganha este mês.":`Sobra menos que o ideal — reduza ${fmt(d)} dos custos fixos.`)},
-            {n:2,emoji:"🏠",c:T.red,title:"Custos fixos",ideal:renda*0.6,real:despMes,kind:"teto",unit:"gasto no mês",
-              rec:(ok,d)=>ok?"Custos fixos sob controle (dentro de 60%).":`Acima do ideal em ${fmt(d)} — corte aqui para liberar investimento.`},
-            {n:3,emoji:"🛟",c:T.blue,title:"Reserva de emergência",ideal:renda*6,real:patrimonio,kind:"meta",unit:"acumulado",
-              rec:(ok,d)=>ok?"Reserva completa — você está protegido.":`Faltam ${fmt(d)} para ter 6 meses de reserva.`},
-            {n:4,emoji:"💎",c:T.green,title:"Aporte mensal",ideal:renda*0.1,real:aporteMes,kind:"floor",unit:"investido no mês",
-              rec:(ok,d)=>ok?"Aporte no ritmo certo (10% ou mais).":`Invista mais ${fmt(d)} este mês para atingir os 10%.`},
-            {n:5,emoji:"🌴",c:T.forest||T.purple,title:"Liberdade financeira",ideal:renda*200,real:patrimonio,kind:"meta",unit:"patrimônio",goal:true,
+            {n:2,emoji:"🏠",c:T.red,title:"Custos fixos",ideal:renda*(PL.fixos/100),real:despMes,kind:"teto",unit:"gasto no mês",
+              rec:(ok,d)=>ok?"Custos fixos sob controle (dentro do ideal).":`Acima do ideal em ${fmt(d)} — corte aqui para liberar investimento.`},
+            {n:3,emoji:"🛟",c:T.blue,title:"Reserva de emergência",ideal:renda*PL.reservaMeses,real:patrimonio,kind:"meta",unit:"acumulado",
+              rec:(ok,d)=>ok?"Reserva completa — você está protegido.":`Faltam ${fmt(d)} para ter ${PL.reservaMeses} meses de reserva.`},
+            {n:4,emoji:"💎",c:T.green,title:"Aporte mensal",ideal:renda*(PL.investir/100),real:aporteMes,kind:"floor",unit:"investido no mês",
+              rec:(ok,d)=>ok?`Aporte no ritmo certo (${PL.investir}% ou mais).`:`Invista mais ${fmt(d)} este mês para atingir os ${PL.investir}%.`},
+            {n:5,emoji:"🌴",c:T.forest||T.purple,title:"Liberdade financeira",ideal:renda*PL.liberdadeMult,real:patrimonio,kind:"meta",unit:"patrimônio",goal:true,
               rec:(ok,d,pct)=>ok?"Liberdade financeira atingida! 🎉":`Você está a ${pct}% do caminho — faltam ${fmt(d)}.`},
           ].map(s=>{
             const ok = s.kind==="teto" ? s.real<=s.ideal+0.005 : s.real>=s.ideal-0.005;
@@ -4076,7 +4155,7 @@ Cancelar = Dar baixa só nesta parcela`);
       {showModal&&<LancModal tipo={showModal} form={showModal==="receita"?recForm:showModal==="despesa"?despForm:showModal==="investimento"?invForm:empForm} setForm={showModal==="receita"?setRecForm:showModal==="despesa"?setDespForm:showModal==="investimento"?setInvForm:setEmpForm} onSave={()=>addItem(showModal)} onClose={()=>setShowModal(null)} cadastros={cadastros} today={today}/>}
 
       {/* MODAL PERFIL & CONFIGURAÇÕES */}
-      {showProfile&&<ProfileModal dark={dark} onToggleTheme={toggleTheme} onClose={()=>{ try{ setAvatarPhoto(gmGetPref("avatar",null)); }catch(e){} setShowProfile(false); }} onLogout={handleLogout} onExport={exportData} onReset={resetAllData} user={authUser} members={members} accountId={accountId} onUpdateMember={updateMember} onInvite={sendInvite} onSaveProfile={saveProfile} isMobile={isMobile}/>}
+      {showProfile&&<ProfileModal dark={dark} onToggleTheme={toggleTheme} onClose={()=>{ try{ setAvatarPhoto(gmGetPref("avatar",null)); }catch(e){} setShowProfile(false); }} onLogout={handleLogout} onExport={exportData} onExportCSV={exportCSV} onReset={resetAllData} user={authUser} members={members} accountId={accountId} onUpdateMember={updateMember} onInvite={sendInvite} onSaveProfile={saveProfile} isMobile={isMobile}/>}
 
       {/* MODAL LANÇAR POR TEXTO (IA) */}
       {showQuickAdd&&<QuickAddModal today={today} dark={dark} cartoes={cartoes} onClose={()=>setShowQuickAdd(false)} onConfirm={addParsedItem}/>}
