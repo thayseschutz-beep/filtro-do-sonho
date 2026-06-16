@@ -389,17 +389,20 @@ function PMPerfil({user,onSaveProfile}){
   const fileRef=useRef(null);
   const onPhoto=(e)=>{ const f=e.target.files&&e.target.files[0]; if(!f)return; if(f.size>3*1024*1024){alert("Imagem muito grande (máx 3MB)");return;} const r=new FileReader(); r.onload=()=>{ // redimensiona p/ ~256px e salva leve
       const img=new Image(); img.onload=()=>{ const c=document.createElement("canvas"); const S=256; const sc=Math.min(S/img.width,S/img.height,1); c.width=img.width*sc; c.height=img.height*sc; c.getContext("2d").drawImage(img,0,0,c.width,c.height); setPhoto(c.toDataURL("image/jpeg",0.82)); }; img.src=r.result; }; r.readAsDataURL(f); };
-  const [form,setForm]=useState({name:user?.name||"",email:user?.email||"",phone:"",pass:""});
+  const savedPhone=user?.phone||gmGetPref("phone","");
+  const [form,setForm]=useState({name:user?.name||"",email:user?.email||"",phone:savedPhone,pass:""});
   const [saving,setSaving]=useState(false);
-  useEffect(()=>{ setForm(f=>({...f,name:user?.name||"",email:user?.email||""})); },[user]);
-  const dirty=(form.name!==(user?.name||""))||(form.email!==(user?.email||""))||!!form.pass;
+  useEffect(()=>{ setForm(f=>({...f,name:user?.name||"",email:user?.email||"",phone:user?.phone||gmGetPref("phone","")})); },[user]);
+  const dirty=(form.name!==(user?.name||""))||(form.email!==(user?.email||""))||(form.phone!==savedPhone)||!!form.pass;
   const doSave=async()=>{
     if(!dirty||!onSaveProfile) return;
     setSaving(true);
     const patch={};
     if(form.name&&form.name!==user?.name) patch.name=form.name;
     if(form.email&&form.email!==user?.email) patch.email=form.email;
+    if(form.phone!==savedPhone) patch.phone=form.phone;
     if(form.pass) patch.password=form.pass;
+    try{ gmSetPref("phone",form.phone||""); }catch(_){}
     const ok=await onSaveProfile(patch);
     if(ok) setForm(f=>({...f,pass:""}));
     setSaving(false);
@@ -418,7 +421,7 @@ function PMPerfil({user,onSaveProfile}){
     <div style={{height:"1px",background:T.border,margin:"8px 0 18px"}}/>
     <p style={{fontSize:"13px",fontWeight:700,color:T.text,margin:"0 0 12px"}}>Alterar senha</p>
     <PMField label="Nova senha" hint="Deixe em branco para manter a atual"><input type="password" style={pmInp()} value={form.pass} onChange={e=>setForm(f=>({...f,pass:e.target.value}))} placeholder="Mínimo 6 caracteres"/></PMField>
-    <div style={{display:"flex",justifyContent:"flex-end",gap:"10px",marginTop:"8px"}}><button onClick={()=>setForm({name:user?.name||"",email:user?.email||"",phone:"",pass:""})} style={pmBtnGhost()}>Cancelar</button><button onClick={doSave} disabled={!dirty||saving} style={{...pmBtnGreen(),opacity:(!dirty||saving)?.5:1,cursor:(!dirty||saving)?"not-allowed":"pointer"}}>{saving?"Salvando…":"Salvar alterações"}</button></div>
+    <div style={{display:"flex",justifyContent:"flex-end",gap:"10px",marginTop:"8px"}}><button onClick={()=>setForm({name:user?.name||"",email:user?.email||"",phone:user?.phone||gmGetPref("phone",""),pass:""})} style={pmBtnGhost()}>Cancelar</button><button onClick={doSave} disabled={!dirty||saving} style={{...pmBtnGreen(),opacity:(!dirty||saving)?.5:1,cursor:(!dirty||saving)?"not-allowed":"pointer"}}>{saving?"Salvando…":"Salvar alterações"}</button></div>
   </div>;
 }
 function PMCasal({user,members,accountId,onUpdateMember,onInvite}){
@@ -932,7 +935,8 @@ export default function App(){
       const u=data?.user;
       if(!u){ if(!cancel){ setAccountReady(true); } return; }
       const myName=(u.user_metadata&&(u.user_metadata.name||u.user_metadata.full_name))||(u.email?u.email.split("@")[0]:"Você");
-      setAuthUser({ id:u.id, email:u.email, name:myName });
+      const myPhone=(u.user_metadata&&u.user_metadata.phone)||gmGetPref("phone","");
+      setAuthUser({ id:u.id, email:u.email, name:myName, phone:myPhone });
       // Resolve a conta (household) deste usuário — isola cada pessoa, mantém o casal junto
       let acc=null;
       try{
@@ -980,18 +984,18 @@ export default function App(){
       return true;
     }catch(e){ console.error(e); showToast("Falha ao convidar (rode o SQL novo)","error"); return false; }
   };
-  const saveProfile = async({name,email,password})=>{
+  const saveProfile = async({name,email,password,phone})=>{
     try{
       const supabase=createClient();
       const payload={};
-      if(name) payload.data={...(payload.data||{}),name};
+      if(name||phone!==undefined){ payload.data={...(name?{name}:{}),...(phone!==undefined?{phone}:{})}; }
       if(email) payload.email=email;
       if(password) payload.password=password;
       if(Object.keys(payload).length){ const {error}=await supabase.auth.updateUser(payload); if(error)throw error; }
       // atualiza diretório (display) do próprio vínculo
       const patch={}; if(name)patch.name=name; if(email)patch.email=email;
       if(Object.keys(patch).length&&authUser?.id){ try{ await supabase.from("user_accounts").update(patch).eq("user_id",authUser.id); }catch(_){} }
-      setAuthUser(u=>({...u,...(name?{name}:{}),...(email?{email}:{})}));
+      setAuthUser(u=>({...u,...(name?{name}:{}),...(email?{email}:{}),...(phone!==undefined?{phone}:{})}));
       showToast(email?"✅ Salvo! Confirme o novo e-mail na sua caixa de entrada.":"✅ Perfil atualizado!");
       return true;
     }catch(e){ console.error(e); showToast(e.message||"Erro ao salvar perfil","error"); return false; }
