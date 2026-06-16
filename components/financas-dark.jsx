@@ -957,6 +957,7 @@ export default function App(){
   const [selMode, setSelMode] = useState(false);        // modo seleção (edição em lote)
   const [selIds, setSelIds] = useState([]);
   const [batchModal, setBatchModal] = useState(null);   // 'mes' | 'categoria'
+  const [planRenda, setPlanRenda] = useState(null);     // renda manual no Planejamento (null = puxa do mês)
   const [recForm, setRecForm] = useState(emptyRecForm(today));
   const [despForm, setDespForm] = useState(emptyDespForm(today));
   const [invForm, setInvForm] = useState(emptyInvForm(today));
@@ -1705,7 +1706,7 @@ Cancelar = Dar baixa só nesta parcela`);
   };
 
   // nav
-  const navItems=[{key:"dashboard",icon:"📊",label:"Dashboard"},{key:"lancamentos",icon:"✏️",label:"Lançamentos"},{key:"provisoes",icon:"⏳",label:"Provisões"},{key:"buscar",icon:"🔍",label:"Buscar"},{key:"relatorio",icon:"📈",label:"Relatório"},{key:"cartoes",icon:"💳",label:"Cartões"},{key:"cadastros",icon:"🗂️",label:"Cadastros"},{key:"mei",icon:"🏢",label:"MEI"},{key:"emitir",icon:"📄",label:"Emitir Relatório"},{key:"sincronizar",icon:"🔄",label:"Sincronizar"}];
+  const navItems=[{key:"dashboard",icon:"📊",label:"Dashboard"},{key:"lancamentos",icon:"✏️",label:"Lançamentos"},{key:"provisoes",icon:"⏳",label:"Provisões"},{key:"planejamento",icon:"🎯",label:"Planejamento"},{key:"buscar",icon:"🔍",label:"Buscar"},{key:"relatorio",icon:"📈",label:"Relatório"},{key:"cartoes",icon:"💳",label:"Cartões"},{key:"cadastros",icon:"🗂️",label:"Cadastros"},{key:"mei",icon:"🏢",label:"MEI"},{key:"emitir",icon:"📄",label:"Emitir Relatório"},{key:"sincronizar",icon:"🔄",label:"Sincronizar"}];
   const cardSubNav=[["cadastro","📋","Cadastro"],["uso","🛒","Uso de Cartões"],["faturas","📄","Faturas"],["relatorio_c","📊","Relatório"],["dashcard","🖥️","Dashboard"]];
   const cadSubNav=[["bancos","🏦","Bancos"],["fornecedores","🏢","Fornecedores"],["pessoas","👤","Pessoas"]];
   const lancTabs=[{key:"receita",label:"📥 Receitas",col:T.green},{key:"despesa",label:"📤 Despesas",col:T.red},{key:"investimento",label:"💎 Investimentos",col:T.blue},{key:"emprestimo",label:"🔄 Empréstimos",col:T.amber}];
@@ -2286,6 +2287,104 @@ Cancelar = Dar baixa só nesta parcela`);
                 })}
               </div>
             ))}
+          </div>
+          );
+        })()}
+
+        {/* ── PLANEJAMENTO (5 Passos — diagnóstico ideal × real) ── */}
+        {activeSection==="planejamento"&&(()=>{
+          const rendaAuto = recTotal; // receitas lançadas no mês
+          const renda = planRenda!=null ? planRenda : rendaAuto;
+          // dados reais
+          const despMes = despTotal;
+          const aporteMes = invTotal;
+          const sobra = renda - despMes - aporteMes; // disponível p/ estilo de vida
+          const patrimonio = Object.values(allYearsData).reduce((s,yr)=>Array.isArray(yr)?s+yr.reduce((ss,m)=>ss+sumArr((m.investimentos||[]).filter(x=>x.investido)),0):s,0);
+          const C={ok:T.green,over:T.red,build:T.amber,low:T.amber};
+          const steps=[
+            {n:1,emoji:"🎡",c:T.indigo,title:"Estilo de vida & lazer",ideal:renda*0.3,real:sobra,kind:"floor",unit:"sobra no mês",
+              rec:(ok,d)=>ok?"Você tem folga para aproveitar a vida sem culpa.":(sobra<0?"⚠️ Você está gastando mais do que ganha este mês.":`Sobra menos que o ideal — reduza ${fmt(d)} dos custos fixos.`)},
+            {n:2,emoji:"🏠",c:T.red,title:"Custos fixos",ideal:renda*0.6,real:despMes,kind:"teto",unit:"gasto no mês",
+              rec:(ok,d)=>ok?"Custos fixos sob controle (dentro de 60%).":`Acima do ideal em ${fmt(d)} — corte aqui para liberar investimento.`},
+            {n:3,emoji:"🛟",c:T.blue,title:"Reserva de emergência",ideal:renda*6,real:patrimonio,kind:"meta",unit:"acumulado",
+              rec:(ok,d)=>ok?"Reserva completa — você está protegido.":`Faltam ${fmt(d)} para ter 6 meses de reserva.`},
+            {n:4,emoji:"💎",c:T.green,title:"Aporte mensal",ideal:renda*0.1,real:aporteMes,kind:"floor",unit:"investido no mês",
+              rec:(ok,d)=>ok?"Aporte no ritmo certo (10% ou mais).":`Invista mais ${fmt(d)} este mês para atingir os 10%.`},
+            {n:5,emoji:"🌴",c:T.forest||T.purple,title:"Liberdade financeira",ideal:renda*200,real:patrimonio,kind:"meta",unit:"patrimônio",goal:true,
+              rec:(ok,d,pct)=>ok?"Liberdade financeira atingida! 🎉":`Você está a ${pct}% do caminho — faltam ${fmt(d)}.`},
+          ].map(s=>{
+            const ok = s.kind==="teto" ? s.real<=s.ideal+0.005 : s.real>=s.ideal-0.005;
+            const pct = s.ideal>0 ? Math.min(100, Math.round(s.real/s.ideal*100)) : 0;
+            const status = s.kind==="teto" ? (ok?"No ideal":"Acima do ideal") : s.kind==="meta" ? (ok?"Concluído":"Em construção") : (ok?"No ideal":"Abaixo do ideal");
+            const col = ok?C.ok : (s.kind==="teto"?C.over:C.build);
+            const diff = Math.abs(s.ideal - s.real);
+            return {...s,ok,pct,status,col,diff};
+          });
+          const score = steps.filter(s=>s.ok).length;
+          const scoreMsg = score>=5?"Vida financeira perfeita! 🎉":score>=4?"Quase lá — falta pouco para o cenário ideal.":score>=2?"No caminho certo, com pontos a ajustar.":"Vamos organizar — comece pelos pontos em vermelho.";
+          return (
+          <div>
+            {/* Hero: renda + score */}
+            <div style={{position:"relative",overflow:"hidden",marginBottom:"16px",background:"linear-gradient(160deg,#1B7A43 0%,#0F2419 100%)",color:"#fff",borderRadius:"20px",padding:"24px"}}>
+              <div style={{position:"absolute",inset:0,opacity:.5,background:"radial-gradient(220px 200px at 92% -20%, rgba(74,222,128,.5), transparent 70%)"}}/>
+              <div style={{position:"relative",display:"flex",flexWrap:"wrap",gap:"24px",alignItems:"flex-end",justifyContent:"space-between"}}>
+                <div style={{minWidth:"220px"}}>
+                  <p style={{fontSize:"12.5px",color:"rgba(255,255,255,.8)",margin:"0 0 6px"}}>Sua renda mensal {planRenda==null&&<span style={{opacity:.7}}>(de {MONTHS[currentMonth]})</span>}</p>
+                  <div style={{display:"flex",alignItems:"baseline",gap:"8px"}}>
+                    <span style={{fontSize:"22px",fontWeight:600,color:"#4ADE80"}}>R$</span>
+                    <input type="number" value={Math.round(renda)||""} onChange={e=>setPlanRenda(parseFloat(e.target.value)||0)}
+                      style={{fontFamily:"'Sora',sans-serif",fontSize:"40px",fontWeight:700,letterSpacing:"-.02em",color:"#fff",background:"none",border:"none",outline:"none",width:"220px",padding:0}}/>
+                  </div>
+                  {planRenda!=null
+                    ? <button onClick={()=>setPlanRenda(null)} style={{marginTop:"4px",background:"rgba(255,255,255,.14)",border:"1px solid rgba(255,255,255,.25)",color:"#fff",borderRadius:"8px",padding:"5px 11px",fontSize:"11.5px",fontWeight:600,cursor:"pointer"}}>↺ Usar renda do mês ({fmt(rendaAuto)})</button>
+                    : <p style={{fontSize:"11.5px",color:"rgba(255,255,255,.6)",margin:"4px 0 0"}}>Puxada automaticamente — toque para editar</p>}
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <p style={{fontSize:"12px",color:"rgba(255,255,255,.75)",margin:"0 0 4px"}}>Saúde financeira</p>
+                  <p style={{fontSize:"34px",fontWeight:800,margin:0,fontFamily:"'Sora',sans-serif"}}>{score}<span style={{fontSize:"18px",opacity:.65}}>/5</span></p>
+                  <div style={{display:"flex",gap:"4px",marginTop:"6px",justifyContent:"flex-end"}}>{steps.map(s=><span key={s.n} style={{width:"22px",height:"5px",borderRadius:"3px",background:s.ok?"#4ADE80":"rgba(255,255,255,.25)"}}/>)}</div>
+                </div>
+              </div>
+              <p style={{position:"relative",fontSize:"13px",color:"rgba(255,255,255,.85)",margin:"16px 0 0",fontWeight:500}}>{scoreMsg}</p>
+            </div>
+
+            {/* explicação */}
+            <p style={{fontSize:"12.5px",color:T.textSub,margin:"0 0 14px",lineHeight:1.5}}>Comparamos o <b style={{color:T.text}}>cenário ideal</b> (a metodologia dos 5 passos) com os <b style={{color:T.text}}>seus dados reais</b> de {MONTHS[currentMonth]}. Onde estiver fora, mostramos o ajuste para chegar lá.</p>
+
+            {/* steps */}
+            {steps.map(s=>(
+              <div key={s.n} style={{...card({marginBottom:"12px"}),...(s.goal?{background:"linear-gradient(160deg,#1B7A43 0%,#0F2419 100%)",border:"none",color:"#fff"}:{}),position:"relative",overflow:"hidden"}}>
+                <div style={{display:"flex",alignItems:"center",gap:"13px",marginBottom:"13px"}}>
+                  <span style={{width:"40px",height:"40px",borderRadius:"12px",background:s.goal?"rgba(255,255,255,.14)":s.c+"1A",color:s.goal?"#4ADE80":s.c,display:"grid",placeItems:"center",fontSize:"19px",flexShrink:0}}>{s.emoji}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <p style={{fontSize:"15px",fontWeight:700,margin:0,color:s.goal?"#fff":T.text}}>{s.n}. {s.title}</p>
+                    <p style={{fontSize:"11.5px",margin:"1px 0 0",color:s.goal?"rgba(255,255,255,.6)":T.textMuted}}>{s.kind==="teto"?"Teto recomendado":s.kind==="meta"?"Meta de patrimônio":"Mínimo recomendado"}</p>
+                  </div>
+                  <span style={{flexShrink:0,fontSize:"11px",fontWeight:700,padding:"4px 11px",borderRadius:"999px",background:s.ok?(s.goal?"rgba(74,222,128,.2)":T.greenLight):(s.col===T.red?T.redLight:T.amberLight),color:s.ok?(s.goal?"#4ADE80":T.green):s.col}}>{s.ok?"✓ ":"⚠ "}{s.status}</span>
+                </div>
+                {/* ideal x real */}
+                <div style={{display:"flex",gap:"10px",marginBottom:"11px"}}>
+                  <div style={{flex:1,padding:"11px 13px",borderRadius:"11px",background:s.goal?"rgba(255,255,255,.08)":T.surfaceAlt,border:`1px solid ${s.goal?"rgba(255,255,255,.12)":T.border}`}}>
+                    <p style={{fontSize:"10.5px",textTransform:"uppercase",letterSpacing:".06em",margin:"0 0 3px",color:s.goal?"rgba(255,255,255,.6)":T.textMuted,fontWeight:600}}>Ideal</p>
+                    <p style={{fontSize:"18px",fontWeight:700,margin:0,fontFamily:"'Sora',sans-serif",color:s.goal?"#fff":T.text}}>{fmt(s.ideal)}</p>
+                  </div>
+                  <div style={{flex:1,padding:"11px 13px",borderRadius:"11px",background:s.goal?"rgba(255,255,255,.08)":T.surfaceAlt,border:`1px solid ${s.ok?s.col+"55":s.col+"40"}`}}>
+                    <p style={{fontSize:"10.5px",textTransform:"uppercase",letterSpacing:".06em",margin:"0 0 3px",color:s.goal?"rgba(255,255,255,.6)":T.textMuted,fontWeight:600}}>Você hoje · {s.unit}</p>
+                    <p style={{fontSize:"18px",fontWeight:700,margin:0,fontFamily:"'Sora',sans-serif",color:s.col}}>{fmt(s.real)}</p>
+                  </div>
+                </div>
+                {/* barra */}
+                <div style={{height:"8px",borderRadius:"5px",background:s.goal?"rgba(255,255,255,.14)":T.surfaceAlt,overflow:"hidden",marginBottom:"9px"}}>
+                  <div style={{height:"100%",width:`${s.pct}%`,borderRadius:"5px",background:s.col,transition:"width .5s"}}/>
+                </div>
+                {/* recomendação */}
+                <p style={{fontSize:"12.5px",lineHeight:1.45,margin:0,color:s.goal?"rgba(255,255,255,.85)":(s.ok?T.textSub:T.text),fontWeight:s.ok?400:500}}>
+                  <b style={{color:s.ok?T.green:s.col}}>{s.kind==="meta"?`${s.pct}% · `:""}</b>{s.rec(s.ok,s.diff,s.pct)}
+                </p>
+              </div>
+            ))}
+
+            <p style={{fontSize:"11.5px",color:T.textMuted,margin:"6px 2px 0",lineHeight:1.5}}>💡 Reserva e patrimônio usam seus <b>investimentos já aplicados</b> (todos os meses/anos). Lance seus investimentos para o painel refletir a realidade.</p>
           </div>
           );
         })()}
@@ -4209,7 +4308,7 @@ Cancelar = Dar baixa só nesta parcela`);
                 <div style={{width:"36px",height:"4px",background:T.border,borderRadius:"2px",margin:"0 auto 16px"}}/>
                 <p style={{fontSize:"12px",fontWeight:700,color:T.textSub,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:"12px"}}>Navegação</p>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:"8px"}}>
-                  {[{key:"dashboard",icon:"📊",label:"Dashboard"},{key:"lancamentos",icon:"✏️",label:"Lançamentos"},{key:"buscar",icon:"🔍",label:"Buscar"},{key:"relatorio",icon:"📈",label:"Relatório"},{key:"cartoes",icon:"💳",label:"Cartões"},{key:"cadastros",icon:"🗂️",label:"Cadastros"},{key:"mei",icon:"🏢",label:"MEI"},{key:"emitir",icon:"📄",label:"Emitir PDF"},{key:"sincronizar",icon:"🔄",label:"Sincronizar"}].map(n=>(
+                  {[{key:"dashboard",icon:"📊",label:"Dashboard"},{key:"lancamentos",icon:"✏️",label:"Lançamentos"},{key:"provisoes",icon:"⏳",label:"Provisões"},{key:"planejamento",icon:"🎯",label:"Planejamento"},{key:"buscar",icon:"🔍",label:"Buscar"},{key:"relatorio",icon:"📈",label:"Relatório"},{key:"cartoes",icon:"💳",label:"Cartões"},{key:"cadastros",icon:"🗂️",label:"Cadastros"},{key:"mei",icon:"🏢",label:"MEI"},{key:"emitir",icon:"📄",label:"Emitir PDF"},{key:"sincronizar",icon:"🔄",label:"Sincronizar"}].map(n=>(
                     <div key={n.key} onClick={()=>{setActiveSection(n.key);setShowMobileMenu(false);}} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"4px",padding:"12px 6px",borderRadius:"12px",cursor:"pointer",background:activeSection===n.key?T.purpleLight:T.surfaceAlt,border:`1px solid ${activeSection===n.key?T.purple:T.border}`}}>
                       <span style={{fontSize:"22px"}}>{n.icon}</span>
                       <span style={{fontSize:"9px",fontWeight:600,color:activeSection===n.key?T.purple:T.textSub,textAlign:"center",lineHeight:1.2}}>{n.label}</span>
