@@ -14,8 +14,12 @@ const fmt = (v) => new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL
 const fmtK = (v) => Math.abs(v||0)>=1000?`R$${((v||0)/1000).toFixed(1)}k`:`R$${(v||0).toFixed(0)}`;
 const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2);
 const sumArr = (arr) => (arr||[]).reduce((s,x)=>s+(x.valor||0),0);
-// Investimento: resgate conta negativo; aplicação e rendimento positivos
-const invNet = (arr) => (arr||[]).reduce((s,x)=>s+(x.movimento==="resgate"?-1:1)*(x.valor||0),0);
+// Investimento: resgate conta negativo; aplicação, rendimento e saldo inicial positivos
+const invSign = (x) => x.movimento==="resgate" ? -1 : 1;
+// Fluxo do mês (ignora saldo inicial — não é movimento do mês)
+const invNet = (arr) => (arr||[]).filter(x=>x.movimento!=="saldoInicial").reduce((s,x)=>s+invSign(x)*(x.valor||0),0);
+// Patrimônio acumulado (inclui saldo inicial)
+const invPatrim = (arr) => (arr||[]).reduce((s,x)=>s+invSign(x)*(x.valor||0),0);
 // Empréstimo: ignora itens de "saldo inicial" (dívida pré-existente, não é gasto do mês)
 const sumPag = (arr) => (arr||[]).filter(x=>x.movimento!=="saldoInicial").reduce((s,x)=>s+(x.valor||0),0);
 const LIMITE_MEI_ANUAL = 81000;
@@ -29,7 +33,7 @@ const emptyNFForm = (today="") => ({ meiId:"", competencia:"", dataEmissao:today
 const emptyYear = () => Array.from({length:12},(_,i)=>({month:i,receitas:[],despesas:[],investimentos:[],emprestimos:[]}));
 const emptyCadastros = () => ({bancos:[],fornecedores:[],pessoas:[],catReceitas:[],catDespesas:[],catInvestimentos:[]});
 const emptyRecForm = (today) => ({data:today,desc:"",ref:"",cliente:"",valor:"",formaRec:"pix",banco:"",recorrente:false,recebido:false});
-const emptyDespForm = (today) => ({data:today,desc:"",ref:"",fornecedor:"",valor:"",recorrente:false,formaPag:"avista",parcelas:"1",meioPag:"pix",pago:false});
+const emptyDespForm = (today) => ({data:today,desc:"",ref:"",fornecedor:"",valor:"",recorrente:false,formaPag:"avista",parcelas:"1",meioPag:"pix",pago:false,classe:"fixo"});
 const emptyInvForm = (today) => ({data:today,desc:"",ref:"",valor:"",investido:false,banco:"",movimento:"aplicacao",iof:"",irrf:""});
 const emptyEmpForm = (today) => ({data:today,desc:"",ref:"",parafem:"",valor:"",valorParcela:"",parcelas:"1",dataVenc1:"",dataVencN:"",meioPag:"pix",pago:false,movimento:"parcela",juros:"",multa:"",desconto:""});
 
@@ -219,6 +223,8 @@ function LancModal({tipo,form,setForm,onSave,onClose,cadastros,today}){
               <CheckRow label="Pagamento Recorrente" checked={form.recorrente} onChange={v=>setForm(f=>({...f,recorrente:v}))}/>
               <CheckRow label="Já foi Pago?" checked={form.pago} onChange={v=>setForm(f=>({...f,pago:v}))}/>
             </div>
+            <RadioGroup label="Tipo de custo (para o Planejamento)" value={form.classe||"fixo"} onChange={v=>setForm(f=>({...f,classe:v}))}
+              options={[{value:"fixo",label:"🏠 Fixo"},{value:"variavel",label:"🔀 Variável"},{value:"lazer",label:"🎡 Lazer / estilo de vida"}]}/>
             <RadioGroup label="Forma de Pagamento" value={form.formaPag} onChange={v=>setForm(f=>({...f,formaPag:v}))}
               options={[{value:"avista",label:"À vista"},{value:"parcelado",label:"Parcelado"}]}/>
             {form.formaPag==="parcelado"&&(
@@ -234,12 +240,12 @@ function LancModal({tipo,form,setForm,onSave,onClose,cadastros,today}){
         {tipo==="investimento"&&(
           <div>
             <RadioGroup label="Tipo de movimento" value={form.movimento||"aplicacao"} onChange={v=>setForm(f=>({...f,movimento:v}))}
-              options={[{value:"aplicacao",label:"📥 Aplicação"},{value:"resgate",label:"📤 Resgate"},{value:"rendimento",label:"📈 Rendimento"}]}/>
+              options={[{value:"aplicacao",label:"📥 Aplicação"},{value:"resgate",label:"📤 Resgate"},{value:"rendimento",label:"📈 Rendimento"},{value:"saldoInicial",label:"🏦 Saldo inicial"}]}/>
             <div style={grid}>
               <FormField label="Data" half><input type="date" style={inpDate} value={form.data} onChange={e=>setForm(f=>({...f,data:e.target.value}))}/></FormField>
               <FormField label="Ref. Investimento" half><input style={inpS} placeholder="Ex: INV-001" value={form.ref} onChange={e=>setForm(f=>({...f,ref:e.target.value}))}/></FormField>
               <FormField label="Descrição"><input style={inpS} placeholder="Descrição do investimento" value={form.desc} onChange={e=>setForm(f=>({...f,desc:e.target.value}))}/></FormField>
-              <FormField label={form.movimento==="resgate"?"Valor resgatado (R$)":form.movimento==="rendimento"?"Rendimento (R$)":"Valor aplicado (R$)"} half><input type="number" step="0.01" style={inpS} placeholder="0,00" value={form.valor} onChange={e=>setForm(f=>({...f,valor:e.target.value}))}/></FormField>
+              <FormField label={form.movimento==="resgate"?"Valor resgatado (R$)":form.movimento==="rendimento"?"Rendimento (R$)":form.movimento==="saldoInicial"?"Saldo já investido (R$)":"Valor aplicado (R$)"} half><input type="number" step="0.01" style={inpS} placeholder="0,00" value={form.valor} onChange={e=>setForm(f=>({...f,valor:e.target.value}))}/></FormField>
               <FormField label="Banco / Corretora" half>
                 <input list="bancos-list-i" style={inpS} placeholder="Ex: XP, Nubank" value={form.banco} onChange={e=>setForm(f=>({...f,banco:e.target.value}))}/>
                 <datalist id="bancos-list-i">{bancos.map(b=><option key={b.id} value={b.nome}/>)}</datalist>
@@ -252,7 +258,9 @@ function LancModal({tipo,form,setForm,onSave,onClose,cadastros,today}){
                 <div style={{gridColumn:"span 2"}}><p style={{fontSize:"11px",color:T.textSub,margin:0}}>IOF e IRRF são lançados como <b>despesas separadas</b> no mesmo mês.</p></div>
               </div>
             )}
-            <CheckRow label={form.movimento==="resgate"?"Já foi resgatado?":form.movimento==="rendimento"?"Já caiu na conta?":"Já foi aplicado?"} checked={form.investido} onChange={v=>setForm(f=>({...f,investido:v}))}/>
+            {form.movimento==="saldoInicial"
+              ? <p style={{fontSize:"11.5px",color:T.textSub,margin:"4px 0 0"}}>🏦 Saldo que a conta já tinha — entra direto no patrimônio (Reserva e Liberdade), sem afetar o saldo do mês.</p>
+              : <CheckRow label={form.movimento==="resgate"?"Já foi resgatado?":form.movimento==="rendimento"?"Já caiu na conta?":"Já foi aplicado?"} checked={form.investido} onChange={v=>setForm(f=>({...f,investido:v}))}/>}
           </div>
         )}
 
@@ -325,6 +333,8 @@ function ItemList({items,col,emptyMsg,onEdit,onRemove,onBaixa,tipo,selMode,selId
               {item.movimento==="resgate"&&<span style={{...chip(T.red),fontSize:"10px"}}>📤 Resgate</span>}
               {item.movimento==="rendimento"&&<span style={{...chip(T.green),fontSize:"10px"}}>📈 Rendimento</span>}
               {item.movimento==="saldoInicial"&&<span style={{...chip(T.amber),fontSize:"10px"}}>🏦 Saldo inicial</span>}
+              {item.classe==="lazer"&&<span style={{...chip(T.indigo),fontSize:"10px"}}>🎡 Lazer</span>}
+              {item.classe==="variavel"&&<span style={{...chip(T.amber),fontSize:"10px"}}>🔀 Variável</span>}
               {item.transportadaDe&&<span style={{...chip(T.amber),fontSize:"10px"}} title={"Transportada de "+item.transportadaDe}>➡️ {item.transportadaDe}</span>}
               {item.dataBaixa&&<span style={{fontSize:"10px",color:T.green}}>em {item.dataBaixa}</span>}
             </div>
@@ -1066,7 +1076,7 @@ export default function App(){
   const [selMode, setSelMode] = useState(false);        // modo seleção (edição em lote)
   const [selIds, setSelIds] = useState([]);
   const [batchModal, setBatchModal] = useState(null);   // 'mes' | 'categoria'
-  const [planRenda, setPlanRenda] = useState(null);     // renda manual no Planejamento (null = puxa do mês)
+  const [planRenda, setPlanRenda] = useState(()=>{ try{ const v=gmGetPref("planRenda",null); return (v===null||v===undefined)?null:v; }catch(e){ return null; } });
   const [recForm, setRecForm] = useState(emptyRecForm(today));
   const [despForm, setDespForm] = useState(emptyDespForm(today));
   const [invForm, setInvForm] = useState(emptyInvForm(today));
@@ -1393,7 +1403,7 @@ export default function App(){
           const yrKey=String(ty);
           const baseYear=(Array.isArray(newAllYears[yrKey])&&newAllYears[yrKey].length===12)
             ?newAllYears[yrKey].map(m=>({...m,despesas:[...m.despesas]})):emptyYear();
-          baseYear[tm].despesas.push({id:uid(),desc:f.desc,valor:valorParcela,valorTotal,date:f.data,ref:f.ref,fornecedor:f.fornecedor,recorrente:false,formaPag:"parcelado",parcelas,parcelaNum:i+1,parcelaGroupId:groupId,meioPag:f.meioPag,pago:f.pago&&i===0});
+          baseYear[tm].despesas.push({id:uid(),desc:f.desc,valor:valorParcela,valorTotal,date:f.data,ref:f.ref,fornecedor:f.fornecedor,recorrente:false,formaPag:"parcelado",parcelas,parcelaNum:i+1,parcelaGroupId:groupId,meioPag:f.meioPag,pago:f.pago&&i===0,classe:f.classe||"fixo"});
           newAllYears={...newAllYears,[yrKey]:baseYear};
           criadas++;
         }
@@ -1428,6 +1438,7 @@ export default function App(){
             parcelas:1,
             meioPag:f.meioPag,
             pago:f.pago&&i===startMonth,
+            classe:f.classe||"fixo",
           });
           criadas++;
         }
@@ -1439,13 +1450,13 @@ export default function App(){
         return;
       }
       // ── À VISTA ───────────────────────────────────────────────────
-      item={id:uid(),desc:f.desc,valor:valorTotal,date:f.data,ref:f.ref,fornecedor:f.fornecedor,recorrente:false,formaPag:f.formaPag,parcelas:1,meioPag:f.meioPag,pago:f.pago};
+      item={id:uid(),desc:f.desc,valor:valorTotal,date:f.data,ref:f.ref,fornecedor:f.fornecedor,recorrente:false,formaPag:f.formaPag,parcelas:1,meioPag:f.meioPag,pago:f.pago,classe:f.classe||"fixo"};
       setDespForm(emptyDespForm(today));
     } else if(tipo==="investimento"){
       f=invForm; key="investimentos";
       if(!f.desc||!f.valor){showToast("Preencha descrição e valor","error");return;}
       const mov=f.movimento||"aplicacao";
-      item={id:uid(),desc:f.desc,valor:parseFloat(f.valor)||0,date:f.data,ref:f.ref,investido:f.investido,banco:f.banco,movimento:mov};
+      item={id:uid(),desc:f.desc,valor:parseFloat(f.valor)||0,date:f.data,ref:f.ref,investido:mov==="saldoInicial"?true:f.investido,banco:f.banco,movimento:mov};
       if(mov==="resgate"){
         const iof=parseFloat(String(f.iof).replace(",","."))||0;
         const irrf=parseFloat(String(f.irrf).replace(",","."))||0;
@@ -1772,7 +1783,7 @@ Cancelar = Dar baixa só nesta parcela`);
   useEffect(()=>{ setSelIds([]); setSelMode(false); /* limpa seleção ao trocar de aba/mês */ // eslint-disable-next-line
   },[lancTab,currentMonth,currentYear]);
 
-  const startEdit=(item,tipo)=>setEditingItem({...item,tipo,editDesc:item.desc,editValor:String(item.valor),editDate:item.date||item.data,editRef:item.ref||"",editCliente:item.cliente||"",editFornecedor:item.fornecedor||"",editBanco:item.banco||""});
+  const startEdit=(item,tipo)=>setEditingItem({...item,tipo,editDesc:item.desc,editValor:String(item.valor),editDate:item.date||item.data,editRef:item.ref||"",editCliente:item.cliente||"",editFornecedor:item.fornecedor||"",editBanco:item.banco||"",editClasse:item.classe||"fixo"});
 
   const saveEdit=()=>{
     if(!editingItem)return;
@@ -1780,7 +1791,7 @@ Cancelar = Dar baixa só nesta parcela`);
     const key=tipo==="receita"?"receitas":tipo==="despesa"?"despesas":tipo==="investimento"?"investimentos":"emprestimos";
     const val=parseFloat(editValor)||0;
     if(!editDesc||!val){showToast("Preencha descrição e valor","error");return;}
-    setData(d=>d.map((m,i)=>i===currentMonth?{...m,[key]:m[key].map(x=>x.id===id?{...x,desc:editDesc,valor:val,date:editDate,ref:editingItem.editRef,cliente:editingItem.editCliente,fornecedor:editingItem.editFornecedor,banco:editingItem.editBanco}:x)}:m));
+    setData(d=>d.map((m,i)=>i===currentMonth?{...m,[key]:m[key].map(x=>x.id===id?{...x,desc:editDesc,valor:val,date:editDate,ref:editingItem.editRef,cliente:editingItem.editCliente,fornecedor:editingItem.editFornecedor,banco:editingItem.editBanco,classe:editingItem.editClasse}:x)}:m));
     setEditingItem(null);
     showToast("Item atualizado!");
   };
@@ -2449,27 +2460,32 @@ Cancelar = Dar baixa só nesta parcela`);
 
         {/* ── PLANEJAMENTO (5 Passos — diagnóstico ideal × real) ── */}
         {activeSection==="planejamento"&&(()=>{
-          const rendaAuto = recTotal; // receitas lançadas no mês
+          // Renda FIXA mensal = receitas recorrentes do mês (proxy de salário/renda fixa).
+          // Se não houver recorrente, usa o total de receitas. Pode ser editada à mão.
+          const rendaFixaAuto = sumArr((monthData.receitas||[]).filter(x=>x.recorrente));
+          const rendaAuto = rendaFixaAuto>0 ? rendaFixaAuto : recTotal;
           const renda = planRenda!=null ? planRenda : rendaAuto;
           // dados reais
           const despMes = despTotal;
+          const despFixos = sumArr((monthData.despesas||[]).filter(x=>x.classe!=="lazer"));
+          const despLazer = sumArr((monthData.despesas||[]).filter(x=>x.classe==="lazer"));
           const aporteMes = invTotal;
           const sobra = renda - despMes - aporteMes; // disponível p/ estilo de vida
           const saldoInicialInv = (cadastros.bancos||[]).filter(b=>b.investimento).reduce((s,b)=>s+(b.saldoInicial||0),0);
-          const patrimonio = saldoInicialInv + Object.values(allYearsData).reduce((s,yr)=>Array.isArray(yr)?s+yr.reduce((ss,m)=>ss+invNet((m.investimentos||[]).filter(x=>x.investido)),0):s,0);
+          const patrimonio = saldoInicialInv + Object.values(allYearsData).reduce((s,yr)=>Array.isArray(yr)?s+yr.reduce((ss,m)=>ss+invPatrim((m.investimentos||[]).filter(x=>x.investido)),0):s,0);
           const PL={lazer:30,fixos:60,investir:10,reservaMeses:6,liberdadeMult:200,...gmGetPref("plano",{})};
           const C={ok:T.green,over:T.red,build:T.amber,low:T.amber};
           const steps=[
-            {n:1,emoji:"🎡",c:T.indigo,title:"Estilo de vida & lazer",ideal:renda*(PL.lazer/100),real:sobra,kind:"floor",unit:"sobra no mês",
-              rec:(ok,d)=>ok?"Você tem folga para aproveitar a vida sem culpa.":(sobra<0?"⚠️ Você está gastando mais do que ganha este mês.":`Sobra menos que o ideal — reduza ${fmt(d)} dos custos fixos.`)},
-            {n:2,emoji:"🏠",c:T.red,title:"Custos fixos",ideal:renda*(PL.fixos/100),real:despMes,kind:"teto",unit:"gasto no mês",
-              rec:(ok,d)=>ok?"Custos fixos sob controle (dentro do ideal).":`Acima do ideal em ${fmt(d)} — corte aqui para liberar investimento.`},
+            {n:1,emoji:"🎡",c:T.indigo,title:"Estilo de vida & lazer",ideal:renda*(PL.lazer/100),real:despLazer,kind:"teto",unit:"gasto em lazer no mês",
+              rec:(ok,d)=>ok?`Lazer dentro do ideal (até ${PL.lazer}% da renda). Aproveite sem culpa.`:`Acima do ideal em ${fmt(d)} — segure um pouco o estilo de vida.`},
+            {n:2,emoji:"🏠",c:T.red,title:"Custos fixos",ideal:renda*(PL.fixos/100),real:despFixos,kind:"teto",unit:"fixos + variáveis no mês",
+              rec:(ok,d)=>ok?`Custos (fixos + variáveis) sob controle (até ${PL.fixos}% da renda).`:`Acima do ideal em ${fmt(d)} — corte aqui para liberar investimento.`},
             {n:3,emoji:"🛟",c:T.blue,title:"Reserva de emergência",ideal:renda*PL.reservaMeses,real:patrimonio,kind:"meta",unit:"acumulado",
-              rec:(ok,d)=>ok?"Reserva completa — você está protegido.":`Faltam ${fmt(d)} para ter ${PL.reservaMeses} meses de reserva.`},
+              rec:(ok,d)=>ok?`Reserva completa — ${PL.reservaMeses} meses de renda fixa protegidos.`:`Faltam ${fmt(d)} para ter ${PL.reservaMeses} meses de renda fixa guardados.`},
             {n:4,emoji:"💎",c:T.green,title:"Aporte mensal",ideal:renda*(PL.investir/100),real:aporteMes,kind:"floor",unit:"investido no mês",
-              rec:(ok,d)=>ok?`Aporte no ritmo certo (${PL.investir}% ou mais).`:`Invista mais ${fmt(d)} este mês para atingir os ${PL.investir}%.`},
-            {n:5,emoji:"🌴",c:T.forest||T.purple,title:"Liberdade financeira",ideal:renda*PL.liberdadeMult,real:patrimonio,kind:"meta",unit:"patrimônio",goal:true,
-              rec:(ok,d,pct)=>ok?"Liberdade financeira atingida! 🎉":`Você está a ${pct}% do caminho — faltam ${fmt(d)}.`},
+              rec:(ok,d)=>ok?`Aporte no ritmo certo (${PL.investir}% da renda fixa ou mais).`:`Invista mais ${fmt(d)} este mês para atingir os ${PL.investir}%.`},
+            {n:5,emoji:"🌴",c:T.forest||T.purple,title:"Liberdade financeira",ideal:renda*PL.liberdadeMult,real:patrimonio,kind:"meta",unit:"patrimônio acumulado",goal:true,
+              rec:(ok,d,pct)=>ok?"Liberdade financeira atingida! 🎉":`Você está a ${pct}% da meta — já tem ${fmt(patrimonio)} e faltam ${fmt(d)}.`},
           ].map(s=>{
             const ok = s.kind==="teto" ? s.real<=s.ideal+0.005 : s.real>=s.ideal-0.005;
             const pct = s.ideal>0 ? Math.min(100, Math.round(s.real/s.ideal*100)) : 0;
@@ -2487,15 +2503,15 @@ Cancelar = Dar baixa só nesta parcela`);
               <div style={{position:"absolute",inset:0,opacity:.5,background:"radial-gradient(220px 200px at 92% -20%, rgba(74,222,128,.5), transparent 70%)"}}/>
               <div style={{position:"relative",display:"flex",flexWrap:"wrap",gap:"24px",alignItems:"flex-end",justifyContent:"space-between"}}>
                 <div style={{minWidth:"220px"}}>
-                  <p style={{fontSize:"12.5px",color:"rgba(255,255,255,.8)",margin:"0 0 6px"}}>Sua renda mensal {planRenda==null&&<span style={{opacity:.7}}>(de {MONTHS[currentMonth]})</span>}</p>
+                  <p style={{fontSize:"12.5px",color:"rgba(255,255,255,.8)",margin:"0 0 6px"}}>Sua renda fixa mensal {planRenda==null&&<span style={{opacity:.7}}>(recorrentes de {MONTHS[currentMonth]})</span>}</p>
                   <div style={{display:"flex",alignItems:"baseline",gap:"8px"}}>
                     <span style={{fontSize:"22px",fontWeight:600,color:"#4ADE80"}}>R$</span>
-                    <input type="number" value={Math.round(renda)||""} onChange={e=>setPlanRenda(parseFloat(e.target.value)||0)}
+                    <input type="number" value={Math.round(renda)||""} onChange={e=>{const v=parseFloat(e.target.value)||0; setPlanRenda(v); gmSetPref("planRenda",v);}}
                       style={{fontFamily:"'Sora',sans-serif",fontSize:"40px",fontWeight:700,letterSpacing:"-.02em",color:"#fff",background:"none",border:"none",outline:"none",width:"220px",padding:0}}/>
                   </div>
                   {planRenda!=null
-                    ? <button onClick={()=>setPlanRenda(null)} style={{marginTop:"4px",background:"rgba(255,255,255,.14)",border:"1px solid rgba(255,255,255,.25)",color:"#fff",borderRadius:"8px",padding:"5px 11px",fontSize:"11.5px",fontWeight:600,cursor:"pointer"}}>↺ Usar renda do mês ({fmt(rendaAuto)})</button>
-                    : <p style={{fontSize:"11.5px",color:"rgba(255,255,255,.6)",margin:"4px 0 0"}}>Puxada automaticamente — toque para editar</p>}
+                    ? <button onClick={()=>{setPlanRenda(null); gmSetPref("planRenda",null);}} style={{marginTop:"4px",background:"rgba(255,255,255,.14)",border:"1px solid rgba(255,255,255,.25)",color:"#fff",borderRadius:"8px",padding:"5px 11px",fontSize:"11.5px",fontWeight:600,cursor:"pointer"}}>↺ Usar renda fixa do mês ({fmt(rendaAuto)})</button>
+                    : <p style={{fontSize:"11.5px",color:"rgba(255,255,255,.6)",margin:"4px 0 0"}}>Soma das receitas recorrentes — toque para editar</p>}
                 </div>
                 <div style={{textAlign:"right"}}>
                   <p style={{fontSize:"12px",color:"rgba(255,255,255,.75)",margin:"0 0 4px"}}>Saúde financeira</p>
@@ -2507,7 +2523,7 @@ Cancelar = Dar baixa só nesta parcela`);
             </div>
 
             {/* explicação */}
-            <p style={{fontSize:"12.5px",color:T.textSub,margin:"0 0 14px",lineHeight:1.5}}>Comparamos o <b style={{color:T.text}}>cenário ideal</b> (a metodologia dos 5 passos) com os <b style={{color:T.text}}>seus dados reais</b> de {MONTHS[currentMonth]}. Onde estiver fora, mostramos o ajuste para chegar lá.</p>
+            <p style={{fontSize:"12.5px",color:T.textSub,margin:"0 0 14px",lineHeight:1.5}}>Base de cálculo: sua <b style={{color:T.text}}>renda fixa mensal</b>. O <b style={{color:T.text}}>passo 1</b> usa as despesas de <b style={{color:T.text}}>lazer</b>; o <b style={{color:T.text}}>passo 2</b> soma as <b style={{color:T.text}}>fixas + variáveis</b> (defina o tipo no lançamento). Reserva e liberdade cruzam a meta com o <b style={{color:T.text}}>saldo dos investimentos</b> de {MONTHS[currentMonth]}.</p>
 
             {/* steps */}
             {steps.map(s=>(
@@ -4334,6 +4350,7 @@ Cancelar = Dar baixa só nesta parcela`);
                 {(editingItem.tipo==="despesa")&&<div><label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Fornecedor</label><input style={inpS} value={editingItem.editFornecedor} onChange={e=>setEditingItem(ei=>({...ei,editFornecedor:e.target.value}))}/></div>}
                 {(editingItem.tipo==="receita"||editingItem.tipo==="investimento")&&<div><label style={{fontSize:"12px",color:T.textSub,display:"block",marginBottom:"4px"}}>Banco</label><input style={inpS} value={editingItem.editBanco} onChange={e=>setEditingItem(ei=>({...ei,editBanco:e.target.value}))}/></div>}
               </div>
+              {editingItem.tipo==="despesa"&&<RadioGroup label="Tipo de custo (Planejamento)" value={editingItem.editClasse||"fixo"} onChange={v=>setEditingItem(ei=>({...ei,editClasse:v}))} options={[{value:"fixo",label:"🏠 Fixo"},{value:"variavel",label:"🔀 Variável"},{value:"lazer",label:"🎡 Lazer"}]}/>}
             </div>
             <div style={{display:"flex",gap:"8px",marginTop:"16px",justifyContent:"flex-end",borderTop:`1px solid ${T.border}`,paddingTop:"14px"}}>
               <button style={btnP(T.green)} onClick={saveEdit}>✅ Salvar alteração</button>
