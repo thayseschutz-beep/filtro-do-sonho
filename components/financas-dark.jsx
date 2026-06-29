@@ -128,9 +128,9 @@ function FormField({label,children,half}){
 }
 
 // ── Hero de saldo (estilo GreenMind app) ───────────────────────────────────
-function BalanceHero({recTotal,despTotal,currentMonth,CY}){
+function BalanceHero({recTotal,despTotal,cartaoTotal=0,empTotal=0,currentMonth,CY}){
   const [hide,setHide]=useState(false);
-  const saldo = recTotal - despTotal;
+  const saldo = recTotal - despTotal - cartaoTotal - empTotal;
   const taxa = recTotal>0 ? (saldo/recTotal)*100 : 0;
   const mask=(s)=>hide?"••••••":s;
   const AUp=<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></svg>;
@@ -159,6 +159,7 @@ function BalanceHero({recTotal,despTotal,currentMonth,CY}){
           <div><small style={{display:"block",fontSize:"11px",color:"rgba(255,255,255,.72)"}}>Despesas</small><b style={{fontSize:"14.5px",fontWeight:600}}>{mask(fmt(despTotal))}</b></div>
         </div>
       </div>
+      {(cartaoTotal>0||empTotal>0)&&<div style={{position:"relative",display:"flex",flexWrap:"wrap",gap:"14px",marginTop:"10px",fontSize:"11.5px",color:"rgba(255,255,255,.7)"}}>{cartaoTotal>0&&<span>− Cartão (em aberto): <b style={{color:"#fca5a5",fontWeight:600}}>{mask(fmt(cartaoTotal))}</b></span>}{empTotal>0&&<span>− Empréstimo: <b style={{color:"#fca5a5",fontWeight:600}}>{mask(fmt(empTotal))}</b></span>}</div>}
     </div>
   );
 }
@@ -2123,7 +2124,7 @@ Cancelar = Dar baixa só nesta parcela`);
             {view==="mes"&&(
             <div>
 
-            <BalanceHero recTotal={recTotal} despTotal={despTotal} currentMonth={currentMonth} CY={CY}/>
+            <BalanceHero recTotal={recTotal} despTotal={despTotal} cartaoTotal={cartoes.reduce((s,c)=>s+(!isPago(c.id,CY,currentMonth)?getFat(c.id,CY,currentMonth):0),0)} empTotal={empTotal} currentMonth={currentMonth} CY={CY}/>
 
             <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:"10px",marginBottom:"14px"}}>
               {[
