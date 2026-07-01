@@ -2126,7 +2126,7 @@ Cancelar = Dar baixa só nesta parcela`);
             {view==="mes"&&(
             <div>
 
-            <BalanceHero recTotal={recTotal} despTotal={despTotal} cartaoTotal={cartoes.reduce((s,c)=>s+(!isPago(c.id,CY,currentMonth)?getFat(c.id,CY,currentMonth):0),0)} empTotal={empTotal} currentMonth={currentMonth} CY={CY}/>
+            <BalanceHero recTotal={recTotal} despTotal={despTotal} cartaoTotal={cartoes.reduce((s,c)=>s+getFat(c.id,CY,currentMonth),0)} empTotal={empTotal} currentMonth={currentMonth} CY={CY}/>
 
             <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:"10px",marginBottom:"14px"}}>
               {[
